@@ -1,0 +1,2328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:," />
+<title>Nonlocal Curvature Visualizer</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #e9edf2;
+  --panel: #f6f8fb;
+  --panel2: #eef1f6;
+  --text: #20262f;
+  --dim: #5b6572;
+  --faint: #8a93a0;
+  --border: #d4d9e1;
+  --input: #ffffff;
+  --accent: #b25b0c;
+  --accent-ink: #8f4305;
+  --green: #1f9d44; --orange: #c96a12; --cyan: #0e7c85;
+  --tangent: #41505f; --magenta: #a820a8; --blue: #2f6bd8; --red: #d33f2f;
+  --btn-bg: #c96a12; --btn-ink: #ffffff;
+  --bar-track: #dfe4eb; --bar-fill: #c96a12;
+  --frosted: rgb(246 248 251 / 0.88);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0e13;
+    --panel: #11151c;
+    --panel2: #181e27;
+    --text: #dfe6ee;
+    --dim: #9aa5b3;
+    --faint: #66707d;
+    --border: #252d38;
+    --input: #0e1218;
+    --accent: #ff9f43;
+    --accent-ink: #ffb46a;
+    --green: #3fd968; --orange: #ff9f43; --cyan: #48d9e3;
+    --tangent: #aeb9c7; --magenta: #e05ce0; --blue: #6b9cff; --red: #ff6b5e;
+    --btn-bg: #c96a12; --btn-ink: #ffffff;
+    --bar-track: #232b36; --bar-fill: #ff9f43;
+    --frosted: rgb(17 21 28 / 0.88);
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+}
+#app { display: flex; height: 100dvh; }
+
+/* ---------- 3D viewport ---------- */
+#viewwrap { flex: 1 1 auto; min-width: 0; position: relative; background: var(--bg); }
+#viewport { position: absolute; inset: 0; touch-action: none; }
+#viewport canvas { display: block; touch-action: none; }
+#labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.tag {
+  position: absolute; transform: translate(-50%, -120%);
+  font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--frosted);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 7px; white-space: nowrap; color: var(--text);
+}
+.tag.odd { border-color: var(--orange); color: var(--orange); }
+.tag.even { border-color: var(--blue); color: var(--blue); }
+.tag.kdim { color: var(--faint); font-size: 11px; transform: translate(6px, -50%); }
+#viewstatus {
+  position: absolute; left: 10px; bottom: 10px; max-width: 70%;
+  font-size: 12px; color: var(--dim);
+  background: var(--frosted);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  display: none;
+}
+#viewstatus.show { display: block; }
+#viewstatus .bar { height: 5px; background: var(--bar-track); border-radius: 3px; margin-top: 6px; min-width: 180px;}
+#viewstatus .bar > i { display:block; height:100%; width:0; background: var(--bar-fill); border-radius: 3px; }
+#no3d {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  color: var(--dim); text-align: center; padding: 24px;
+}
+#no3d.show { display: flex; }
+
+/* ---------- intro overlay ---------- */
+#intro-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgb(8 11 16 / 0.62);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px;
+}
+#intro-overlay.show { display: flex; }
+#intro-card {
+  width: min(620px, 100%); max-height: min(86dvh, 760px); overflow-y: auto;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
+}
+#intro-card h2 { margin: 0 0 10px; font-size: 20px; line-height: 1.25; }
+#intro-card p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; }
+#intro-card ol { margin: 2px 0 6px 20px; padding: 0; font-size: 14px; line-height: 1.55; }
+#intro-card li { margin: 0 0 8px; }
+#intro-eq { display: block; width: 100%; height: auto; margin: 10px auto 4px; }
+@media (prefers-color-scheme: dark) {
+  #intro-eq { filter: invert(1); }
+}
+.intro-dots { display: flex; gap: 6px; align-items: center; margin-top: 12px; }
+.intro-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+.intro-dot.on { background: var(--accent); }
+.intro-actions { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
+.intro-actions .sp { flex: 1; }
+.intro-actions .btn { width: auto; margin-top: 0; padding: 8px 14px; }
+.intro-actions .btn.ghost { padding: 8px 12px; }
+#sharelink { margin-top: 8px; }
+#sharelink-msg { min-height: 15px; font-size: 12px; color: var(--accent-ink); margin-top: 4px; }
+
+/* ---------- side panel ---------- */
+#panel {
+  width: 372px; flex: 0 0 auto; background: var(--panel);
+  border-left: 1px solid var(--border); overflow-y: auto; overflow-x: hidden;
+}
+.sect { padding: 13px 16px 15px; border-bottom: 1px solid var(--border); }
+.sect h2 {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--dim);
+}
+.hdr { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); background: var(--panel2); }
+.hdr .ttl { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.hdr .sub { font-size: 12px; color: var(--dim); }
+.row { margin: 8px 0; }
+.row label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 3px; }
+.row label .val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent-ink); font-size: 12.5px; white-space: nowrap; }
+.row label input.sigval { width: 96px; padding: 2px 7px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--accent-ink); text-align: right; }
+input[type="range"] { width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
+input[type="text"], input[type="number"], select, textarea {
+  background: var(--input); color: var(--text); border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 8px; font-size: 13px; width: 100%;
+}
+input[type="number"] { width: 110px; }
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; min-height: 27px; }
+.expr-grid { display: grid; grid-template-columns: 28px 1fr; gap: 4px 8px; align-items: center; margin-top: 6px; }
+.expr-grid code { font-size: 13px; color: var(--dim); }
+.duo { display: flex; gap: 8px; }
+.duo > * { flex: 1; min-width: 0; }
+/* compact classical-vs-nonlocal comparison row under the σ slider */
+.cmp { display: flex; gap: 8px; margin: 5px 0 9px; }
+.cmp-cell { flex: 1 1 0; min-width: 0; background: var(--panel2); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; }
+.cmp-hd { font-size: 11.5px; color: var(--dim); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmp-mag { font: 700 14px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); }
+.cmp-comp { font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); overflow-wrap: anywhere; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+.chk input { accent-color: var(--accent); width: auto; }
+.btn {
+  display: inline-block; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--btn-bg); color: var(--btn-ink); font-size: 14px; font-weight: 600;
+  padding: 9px 14px; width: 100%; margin-top: 6px;
+}
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); font-weight: 500; width: auto; padding: 7px 12px; font-size: 13px; }
+.btnrow { display: flex; gap: 8px; margin-top: 8px; }
+.btnrow .btn.ghost { flex: 1; }
+.progress { height: 6px; background: var(--bar-track); border-radius: 3px; margin-top: 10px; display: none; }
+.progress.show { display: block; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--bar-fill); border-radius: 3px; transition: width 0.12s; }
+.ptext { font-size: 12px; color: var(--dim); margin-top: 5px; display: none; min-height: 17px; }
+.ptext.show { display: block; }
+
+/* results table */
+table.res { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+table.res th { text-align: left; font-weight: 600; color: var(--dim); padding: 5px 4px; border-bottom: 1px solid var(--border); }
+table.res td { padding: 5px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.res tr:last-child td { border-bottom: 0; }
+table.res .num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+table.res .se { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); white-space: nowrap; font-size: 11.5px; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.notes { font-size: 12px; color: var(--dim); margin-top: 8px; }
+.warn { font-size: 12px; color: var(--accent-ink); margin-top: 8px; }
+.stale { display: none; font-size: 11.5px; color: var(--accent-ink); margin-top: 6px; }
+.stale.show { display: block; }
+.sigmerr { display: none; font-size: 11.5px; color: var(--accent-ink); margin: -2px 0 10px; }
+.sigmerr.show { display: block; }
+
+#plotwrap { margin-top: 6px; }
+#plot { width: 100%; height: 190px; display: block; border: 1px solid var(--border); border-radius: 8px; background: var(--input); }
+
+/* conventions */
+details { margin: 2px 0; }
+details summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; }
+details p, details ul { font-size: 12.5px; color: var(--dim); margin: 6px 0; }
+details ul { padding-left: 18px; }
+details li { margin: 4px 0; }
+details .math { display: block; background: var(--panel2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text); overflow-x: auto; }
+details a { color: var(--accent-ink); }
+/* function reference disclosure under the custom-expression inputs */
+details.funcref { margin-top: 2px; }
+details.funcref summary { display: inline-block; font-size: 12px; font-weight: 400; color: var(--accent-ink); padding: 2px 0; list-style: none; }
+details.funcref summary::-webkit-details-marker { display: none; }
+details.funcref summary::marker { content: none; }
+details.funcref ul { font-size: 12px; margin: 4px 0 2px; }
+.kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 11.5px; }
+.src { font-size: 11.5px; color: var(--faint); margin-top: 10px; }
+
+@media (max-width: 820px) {
+  #app { flex-direction: column; }
+  #viewwrap { flex: 0 0 44vh; min-height: 300px; order: 0; }
+  #panel { width: 100%; flex: 1 1 auto; border-left: 0; border-top: 1px solid var(--border); order: 1; }
+  table.res thead { display: none; }
+  table.res, table.res tbody, table.res tr, table.res td { display: block; width: 100%; }
+  table.res tr { padding: 5px 0; border-bottom: 1px solid var(--border); }
+  table.res td { border: 0; padding: 1px 4px; }
+  table.res .num, table.res .se { white-space: normal; }
+}
+</style>
+</head>
+<body>
+<div id="intro-overlay" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+  <div id="intro-card">
+    <div id="intro-slide-1" class="intro-slide">
+      <h2 id="intro-title">Nonlocal curvature</h2>
+      <p>Classical curvature &kappa;(z) at a point z measures the curve&rsquo;s infinitesimal bending there: for an arc-length parametrization, &kappa; = |dT/ds| &mdash; the magnitude of the rate of change of the unit tangent (equivalently &kappa; = |&gamma;&prime; &times; &gamma;&Prime;|/|&gamma;&prime;|<sup>3</sup> in any parametrization), pointing along the principal normal.</p>
+      <p>Instead of the infinitesimal neighborhood, nonlocal curvature &kappa;<sub>&sigma;</sub>(z) integrates over the (2n&minus;2)-dimensional space of disks in &#8477;<sup>n</sup>: every point of the domain represents a disk D of radius r with a given center offset and orientation. Each disk&rsquo;s contribution is weighted by r<sup>(&minus;1&minus;&sigma;)</sup>, multiplied by the parity of the disk&rsquo;s intersection with the curve (+1 for an odd number of intersections, &minus;1 for even). Notice this emphasizes small disks. The result is a vector at z that sees the whole curve.</p>
+      <img id="intro-eq" src="assets/eq18-functional.png" alt="Defining functional for nonlocal curvature: kappa sub sigma of z equals principal value of integral over even set minus integral over odd set of ((a dot t)b minus (b dot t)a) over r to the 1 plus sigma dH to the 2n minus 2" />
+    </div>
+    <div id="intro-slide-2" class="intro-slide" style="display:none">
+      <h2>This tool (the &#8477;<sup>3</sup> case)</h2>
+      <p>This tool implements the case n = 3: curves in three-space, with a 4-dimensional integration domain (radius + disk position/orientation). The integral is evaluated by Monte Carlo &mdash; the r-integral splits at a singularity radius r<sub>s</sub> into a near-field head (fixed-radius sampling, linear extrapolation to r = 0) and a far-field tail (Pareto sampling), with disk parameters sampled uniformly.</p>
+      <p>The point of the tool is the &sigma; &rarr; 1 limit: the rescaled vector &kappa;&#771;<sub>&sigma;</sub> := (1&minus;&sigma;)&kappa;<sub>&sigma;</sub>/c<sub>3</sub>, with c<sub>3</sub> = &pi;<sup>2</sup>&radic;2 &asymp; 13.96, converges to the classical curvature vector as &sigma; &rarr; 1. That convergence is the subject of Dan Zimmerman&rsquo;s paper &ldquo;The asymptotics of nonlocal curvature for curves.&rdquo; The paper operates in full generality rather than focusing on &#8477;<sup>3</sup>, but since we live in three dimensions it&rsquo;s easiest to visualize &#8477;<sup>3</sup>.</p>
+      <p>The main 3D view shows the curve, the evaluation point z, and the classical vs. rescaled nonlocal curvature vectors side by side. The &sigma;-sweep plot traces |&kappa;&#771;<sub>&sigma;</sub>| against &sigma;, with the exact circle formula and the &kappa;(z) limit line for reference.</p>
+    </div>
+    <div id="intro-slide-3" class="intro-slide" style="display:none">
+      <h2>UI tour</h2>
+      <ol>
+        <li><b>Curve</b> &mdash; pick a preset (circle, trefoil, helix, line) or choose &ldquo;Custom parametric&hellip;&rdquo; to type your own x(t), y(t), z(t).</li>
+        <li><b>t<sub>0</sub> slider</b> &mdash; drag to move the evaluation point z along the curve (symmetric about 0).</li>
+        <li><b>&sigma; slider</b> &mdash; move it (or type any value in (0, 1)) and watch &kappa;&#771;<sub>&sigma;</sub> walk onto the classical curvature vector as &sigma; &rarr; 1. The compact row under the slider shows both, with error bars.</li>
+        <li><b>Disc explorer</b> &mdash; place individual disks by hand; red/blue shows odd/even intersection parity, the same &plusmn;1 weight inside the integral.</li>
+        <li><b>&sigma;-sweep</b> &mdash; runs the estimator across a &sigma; range and plots the convergence curve.</li>
+        <li><b>MC cloud</b> &mdash; toggle to see where the Monte Carlo samples actually land.</li>
+        <li><b>Advanced MC settings (bottom)</b> &mdash; N<sub>head</sub>, N<sub>tail</sub>, r<sub>s</sub> if you want to tune the estimator; there&rsquo;s a tuning guide in the details.</li>
+      </ol>
+    </div>
+    <div class="intro-dots" aria-hidden="true"><span class="intro-dot on" id="intro-dot-1"></span><span class="intro-dot" id="intro-dot-2"></span><span class="intro-dot" id="intro-dot-3"></span></div>
+    <div class="intro-actions">
+      <button class="btn ghost" id="intro-back" type="button">Back</button>
+      <button class="btn ghost" id="intro-skip" type="button">Skip</button>
+      <span class="sp"></span>
+      <button class="btn" id="intro-next" type="button">Next</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+
+<div id="viewwrap" aria-label="3D visualization">
+  <div id="viewport"></div>
+  <div id="labels"></div>
+  <div id="no3d"><div>3D view needs the Three.js CDN.<br>Numbers still compute fine below.</div></div>
+  <div id="viewstatus"></div>
+</div>
+
+<aside id="panel">
+  <div class="hdr">
+    <div class="ttl">Nonlocal curvature of a parametric curve</div>
+    <div class="sub">Disc-counting MC for nonlocal curvature &kappa;<sub>&sigma;</sub>. Limit c&#8323; = &pi;&sup2;&radic;2 &asymp; 13.9577 (Zimmerman, <i>The asymptotics of nonlocal curvature for curves</i>, Theorem&nbsp;6.1); odd/even open-disk counting per Seguin, arXiv:1808.08654v6, eq.&nbsp;(109). Open <b>Conventions &amp; caveats</b> (bottom) before trusting a number.</div>
+    <button class="btn ghost" id="sharelink" type="button">Copy share link</button>
+    <div id="sharelink-msg" aria-live="polite"></div>
+  </div>
+
+  <div class="sect">
+    <h2>Curve</h2>
+    <div class="row">
+      <label>Preset
+        <select id="preset" aria-label="Curve preset">
+          <option value="circle">Unit circle &mdash; canonical test case</option>
+          <option value="trefoil">Trefoil knot</option>
+          <option value="helix">Helix (c = 0.3)</option>
+          <option value="line">Straight line</option>
+          <option value="custom">Custom parametric&hellip;</option>
+        </select>
+      </label>
+    </div>
+    <div id="custombox" style="display:none">
+      <div class="expr-grid">
+        <code>x(t)</code><textarea id="fx" rows="1" aria-label="x(t) expression">t</textarea>
+        <code>y(t)</code><textarea id="fy" rows="1" aria-label="y(t) expression">t^2</textarea>
+        <code>z(t)</code><textarea id="fz" rows="1" aria-label="z(t) expression">0</textarea>
+      </div>
+      <div class="duo" style="margin-top:6px">
+        <div><label style="font-size:12px;color:var(--dim)">t min<input type="number" id="tmin" value="-1" step="any" style="width:100%" aria-label="t min"></label></div>
+        <div><label style="font-size:12px;color:var(--dim)">t max<input type="number" id="tmax" value="1" step="any" style="width:100%" aria-label="t max"></label></div>
+      </div>
+      <div class="notes">Operators: <span class="kbd">+ - * / ^</span>, <span class="kbd">t</span>, <span class="kbd">pi</span>, <span class="kbd">e</span>. Examples: <span class="kbd">sin(3*t)/t</span>, <span class="kbd">2t</span></div>
+      <details class="funcref" id="funcref">
+        <summary><span aria-hidden="true">&#9432;</span> Full function reference</summary>
+        <ul>
+          <li><b>Variable:</b> t (the curve parameter)</li>
+          <li><b>Constants:</b> pi, e</li>
+          <li><b>Arithmetic:</b> <span class="kbd">+</span> <span class="kbd">-</span> <span class="kbd">*</span> <span class="kbd">/</span> <span class="kbd">^</span> (power) and parentheses; juxtaposition also multiplies: <span class="kbd">2t</span>, <span class="kbd">t^5 sin(1/t)</span>, <span class="kbd">2(3+4)</span>, <span class="kbd">(t+1)(t-1)</span></li>
+          <li><b>Trig:</b> sin, cos, tan; inverses asin, acos, atan, atan2(y,&thinsp;x)</li>
+          <li><b>Hyperbolic:</b> sinh, cosh, tanh; inverses asinh, acosh, atanh</li>
+          <li><b>Power / logs / roots:</b> exp, log (natural), log10, sqrt, cbrt</li>
+          <li><b>Abs &amp; rounding:</b> abs, floor, ceil, sign; <b>combining:</b> min(…), max(…)</li>
+          <li><b>Comparisons</b> <span class="kbd">==</span> <span class="kbd">!=</span> <span class="kbd">&lt;</span> <span class="kbd">&gt;</span> <span class="kbd">&lt;=</span> <span class="kbd">&gt;=</span> → 1 or 0;&thinsp; <b>piecewise:</b> <span class="kbd">if(t==0, 0, t^5*sin(1/t))</span></li>
+        </ul>
+      </details>
+    </div>
+    <div class="row">
+      <label>Closed curve <span class="chk" style="margin:0"><input type="checkbox" id="closed" aria-label="Closed curve"> <span id="closedauto" style="color:var(--faint);font-size:12px">auto</span></span></label>
+    </div>
+    <div class="row">
+      <label>Polyline resolution <span class="val" id="nptsv">1200</span></label>
+      <input type="range" id="npts" min="200" max="4000" step="100" value="1200" aria-label="Polyline resolution">
+    </div>
+    <div class="btnrow"><button class="btn ghost" id="applycurve">Rebuild curve</button></div>
+    <div class="warn" id="curveerr" style="display:none"></div>
+  </div>
+
+  <div class="sect">
+    <h2>Evaluation point z</h2>
+    <div class="row">
+      <label>Parameter t&#8320; <span class="val" id="t0v"></span></label>
+      <input type="range" id="t0" min="-1000" max="1000" value="0" aria-label="Evaluation parameter t0">
+    </div>
+    <div class="duo">
+      <div><label style="font-size:12px;color:var(--dim)">t&#8320; value<input type="text" id="t0n" aria-label="t₀ value" style="width:100%;font-family:ui-monospace,monospace"></label></div>
+      <div><label style="font-size:12px;color:var(--dim)">z = &gamma;(t&#8320;)<input type="text" id="zv" readonly aria-label="z = γ(t₀)" style="width:100%;font-family:ui-monospace,monospace;color:var(--dim)"></label></div>
+    </div>
+    <div class="sigmerr" id="t0err"></div>
+    <div class="notes">Classical curvature is evaluated at z from &gamma;&prime;, &gamma;&prime;&prime; by central differences.</div>
+  </div>
+
+  <div class="sect">
+    <h2>Estimator</h2>
+    <div class="row">
+      <label>&sigma; (fractional power) <input type="number" id="sign" class="sigval" min="0" max="1" step="any" value="0.90" aria-label="Sigma value"></label>
+      <input type="range" id="sig" min="0.05" max="0.9999" step="0.0001" value="0.90" aria-label="Sigma">
+    </div>
+    <div class="sigmerr" id="sigmerr">&sigma; must be strictly between 0 and 1.</div>
+    <div class="cmp" id="vkrow" aria-label="Classical vs nonlocal curvature at z">
+      <div class="cmp-cell">
+        <div class="cmp-hd"><span class="dot" style="background:var(--green)"></span>&kappa;&#8407; classical</div>
+        <div class="cmp-mag" id="vkcm">&mdash;</div>
+        <div class="cmp-comp" id="vkcc"></div>
+      </div>
+      <div class="cmp-cell">
+        <div class="cmp-hd"><span class="dot" style="background:var(--cyan)"></span>&kappa;&#771;<sub>&sigma;</sub></div>
+        <div class="cmp-mag" id="vknm">&mdash;</div>
+        <div class="cmp-comp" id="vknc"></div>
+      </div>
+    </div>
+    <button class="btn" id="compute">Compute &kappa;<sub>&sigma;</sub></button>
+    <button class="btn ghost" id="cancelbtn" style="display:none;width:100%">Cancel</button>
+    <div class="chk"><input type="checkbox" id="livesig" aria-label="Live update when σ slider moves (tail MC only, N=20k)" checked> <span>Live update when &sigma; slider moves <span style="color:var(--faint)">(tail MC only, N=20k)</span></span></div>
+    <div class="progress" id="prog"><i></i></div>
+    <div class="ptext" id="ptext"></div>
+    <div class="stale" id="stale">Geometry changed &mdash; press Compute to refresh.</div>
+  </div>
+
+  <div class="sect">
+    <h2>&sigma;-sweep: watching the limit</h2>
+    <div id="plotwrap"><svg id="plot" role="img" aria-label="Sigma sweep plot"></svg></div>
+    <div class="btnrow" style="align-items:flex-end">
+      <div style="flex:1 1 0;min-width:0"><label style="font-size:12px;color:var(--dim)">&sigma;<sub>min</sub><input type="number" id="smin" value="0.1" step="any" min="0" max="1" style="width:100%" aria-label="Sweep sigma min"></label></div>
+      <div style="flex:1 1 0;min-width:0"><label style="font-size:12px;color:var(--dim)">&sigma;<sub>max</sub><input type="number" id="smax" value="0.99" step="any" min="0" max="1" style="width:100%" aria-label="Sweep sigma max"></label></div>
+      <button class="btn ghost" id="sweep">Run &sigma;-sweep</button>
+    </div>
+    <div class="sigmerr" id="sweeperr">Need 0 &lt; &sigma;<sub>min</sub> &lt; &sigma;<sub>max</sub> &lt; 1.</div>
+    <div class="notes">Plots |&kappa;&#771;<sub>&sigma;</sub>| vs &sigma; at 14 sample points spanning [&sigma;<sub>min</sub>, &sigma;<sub>max</sub>], denser toward &sigma;<sub>max</sub> (N=20k tail per point, seed-fixed). Dashed line: &kappa;(z), the classical curvature magnitude at the current evaluation point z (tracks t&#8320; and the curve preset). On the circle preset, the gray dash-dot curve is Dan's exact finite-&sigma; value divided by c&#8323; over the same range (Corollary&nbsp;4.2).</div>
+  </div>
+
+  <div class="sect">
+    <h2>Disc explorer</h2>
+    <div class="row">
+      <label>Disc radius r <input type="number" id="ern" class="sigval" step="any" aria-label="Explorer disc radius value"></label>
+      <input type="range" id="er" min="0" max="1000" value="600" aria-label="Explorer disc radius">
+    </div>
+    <div class="sigmerr" id="ererr">Need r &gt; 0.</div>
+    <div class="row">
+      <label>a-direction offset &theta; <input type="number" id="etn" class="sigval" step="any" aria-label="θ value"></label>
+      <input type="range" id="eth" min="0" max="1000" step="1" value="250" aria-label="a direction theta">
+    </div>
+    <div class="row">
+      <label>a-direction offset &phi; <input type="number" id="epn" class="sigval" step="any" aria-label="φ value"></label>
+      <input type="range" id="eph" min="0" max="1000" step="1" value="500" aria-label="a direction phi">
+    </div>
+    <div class="row">
+      <label>b-angle on circle &perp; a <input type="number" id="ebn" class="sigval" step="any" aria-label="b-angle value"></label>
+      <input type="range" id="eba" min="0" max="1000" step="1" value="370" aria-label="b angle">
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="randdisc">Random disc</button>
+      <button class="btn ghost" id="randodd">Random odd disc</button>
+    </div>
+    <div class="notes" id="exclass" style="margin-top:10px"></div>
+  </div>
+
+  <div class="sect">
+    <h2>View</h2>
+    <div class="chk"><input type="checkbox" id="vcloud"> MC integrand cloud (&le;400 disc rings)</div>
+    <div class="chk"><input type="checkbox" id="varrows" checked> Vector arrows at z</div>
+    <div class="chk"><input type="checkbox" id="vdisc" checked> Disc explorer</div>
+    <div class="chk"><input type="checkbox" id="vlen"> Arrow length key <span style="color:var(--faint)">(labels exact lengths)</span></div>
+    <div class="chk"><input type="checkbox" id="vrot"> Auto-rotate</div>
+    <div class="notes">Orbit: drag &middot; zoom: wheel/pinch &middot; pan: right-drag or shift-drag.</div>
+  </div>
+
+  <div class="sect">
+    <details id="adv">
+      <summary>Advanced MC settings</summary>
+      <div class="row">
+        <label>Singularity radius r<sub>s</sub> <input type="number" id="rsn" class="sigval" step="any" value="0.05" aria-label="r_s value"></label>
+        <input type="range" id="rs" min="0" max="1000" value="500" aria-label="Singularity radius">
+      </div>
+      <div class="sigmerr" id="rserr">Need r<sub>s</sub> &gt; 0.</div>
+      <div class="duo">
+        <div><label style="font-size:12px;color:var(--dim)">N head<input type="number" id="nh" value="200000" min="1000" step="10000" aria-label="N head" style="width:100%"></label></div>
+        <div><label style="font-size:12px;color:var(--dim)">N tail<input type="number" id="nt" value="60000" min="1000" step="10000" aria-label="N tail" style="width:100%"></label></div>
+      </div>
+      <div class="notes" style="margin-top:10px"><b>Tuning the Monte Carlo parameters</b></div>
+      <ul>
+        <li><b>N<sub>head</sub>:</b> MC samples in the head part — the fixed-radius estimate of F(r<sub>s</sub>). More samples &rarr; smaller SE on the near-singularity contribution, linear time cost.</li>
+        <li><b>N<sub>tail</sub>:</b> Pareto samples in the tail (r &gt; r<sub>s</sub>). More samples &rarr; smaller SE on the far-field contribution.</li>
+        <li><b>r<sub>s</sub> (singularity radius):</b> the split point between head and tail. Smaller r<sub>s</sub> makes the head's linear extrapolation F(r) &asymp; [F(r<sub>s</sub>)/r<sub>s</sub>]·r on (0,&thinsp;r<sub>s</sub>) more accurate but shifts more of the integral into the tail; larger r<sub>s</sub> puts more into the cheap fixed-radius head sampling, but the linear extrapolation degrades if F curves appreciably on (0,&thinsp;r<sub>s</sub>). Rule of thumb: keep r<sub>s</sub> small next to the curve's radius of curvature; if one part's SE dominates the other, shift r<sub>s</sub> or rebalance N<sub>head</sub> vs N<sub>tail</sub>.</li>
+        <li><b>Error-bar scaling:</b> SE &sim; 1/&radic;N, so 4&times; samples halves the error bars.</li>
+      </ul>
+      <div class="notes">These take effect on the next Compute; changing r<sub>s</sub> marks current results stale.</div>
+    </details>
+  </div>
+
+  <div class="sect">
+    <details id="appear">
+      <summary>Appearance</summary>
+      <div class="row">
+        <label>Curve line thickness <input type="number" id="thn" class="sigval" step="any" value="1" aria-label="Curve line thickness"></label>
+        <input type="range" id="th" min="0" max="8000" step="1" value="1000" aria-label="Curve line thickness">
+      </div>
+      <div class="sigmerr" id="therr">Thickness must be &ge; 0.</div>
+      <div class="notes">Tube radius and 3D point sizes (z marker, disc-explorer intersection dots, MC cloud rings) as multiples of the default; updates the rendering live, without re-running the Monte Carlo.</div>
+    </details>
+  </div>
+
+  <div class="sect">
+    <details id="resdet">
+      <summary>Detailed results at z</summary>
+      <table class="res" aria-label="Detailed results">
+        <thead><tr><th>Quantity</th><th>Value</th><th>&plusmn; SE</th></tr></thead>
+        <tbody id="restbody"><tr><td colspan="3" style="color:var(--faint)">Press Compute.</td></tr></tbody>
+      </table>
+      <div id="resnotes"></div>
+      <div class="notes">Ratio target: (1&minus;&sigma;)|&kappa;<sub>&sigma;</sub>|/&kappa; &rarr; c&#8323; = &pi;&sup2;&radic;2 &asymp; 13.958 as &sigma;&rarr;1 (Dan, Theorem&nbsp;6.1), and &kappa;&#771;<sub>&sigma;</sub> aligns with the classical curvature vector (cos&thinsp;&theta; &rarr; +1), pointing <b>inward</b> on the circle.</div>
+    </details>
+  </div>
+
+  <div class="sect">
+    <details id="conv">
+      <summary>Conventions &amp; caveats</summary>
+      <span class="math">&kappa;<sub>&sigma;</sub>(z) = lim<sub>&epsilon;&rarr;0</sub> [ &int;<sub>A<sub>e</sub>&#8314;</sub> &minus; &int;<sub>A<sub>o</sub>&#8314;</sub> ] (b&and;a)t(z) / r<sup>1+&sigma;</sup> dH&#8308;</span>
+      <ul>
+        <li><b>Sign.</b> Implemented as [A<sub>e</sub>&#8314; &minus; A<sub>o</sub>&#8314;], Dan's definition (1.8): for the counterclockwise unit circle at z=(1,0,0) this gives &kappa;<sub>&sigma;</sub> along &minus;x&#770; (inward), parallel to the classical curvature vector. Seguin's eq.&nbsp;(109) writes the sign-uncorrected odd&minus;even order; this page flips it so the displayed &kappa;<sub>&sigma;</sub> (orange) matches Dan's convention, and the 3D view shows the classical &kappa;&#8407; vector (green) beside it.</li>
+        <li><b>Measure convention.</b> dH&#8308;(a,b,r) is the Hausdorff measure of U<sub>&perp;</sub>&sup2;(&#8477;&sup3;) with the metric induced from &#8477;&#8310;, i.e. &radic;2&thinsp;dS&sup2;(a)&thinsp;dS&sup1;<sub>a</sub>(b)&thinsp;dr: a uniform on S&sup2;, b uniform on the circle perpendicular to a, times &radic;2. The MC constants carry this &radic;2.</li>
+        <li><b>Odd-only numerics.</b> The vector function v=(b&and;a)t = b(a&middot;t)&minus;a(b&middot;t) has zero mean over all discs under a&harr;&minus;a, so with the [even&minus;odd] sign the even term never needs separate MC: F(r) = &minus;2&middot;&int;<sub>odd</sub> v&thinsp;d&mu;. This is exactly the same expectation with far less noise.</li>
+        <li><b>Open-disk counting.</b> Each disc is the open disk D(z+a&middot;r,b,r) = {z+a&middot;r+&xi;v : &xi;&isin;[0,r)}: a polyline-to-plane crossing counts only when strictly inside the disk (|q&minus;c|&lt;r); crossings on the rim, including z itself, never count. Counts test as odd/even over the true open-disk curve intersection, not boundary intersections.</li>
+        <li><b>Osculating window at z.</b> Counts near z use the osculating parabola z+s&middot;T(z)+s&sup2;/2&middot;&kappa;&#770;(z), exact to O(h&sup3;), instead of the polyline chord: when z is an exact vertex the two adjacent segments are jointly accounted; otherwise the single z-bracketing segment is. Excluding the z-segment would lose ~7% of F(r) at defaults (O((h/r)<sup>0.8</sup>)), while counting it as a chord injects a ~40&times; parity artifact when z is off-vertex (interpolated sagitta crossing lands inside the disc).</li>
+        <li><b>Singularity treatment.</b> &kappa;<sub>&sigma;</sub> &asymp; HEAD + TAIL: HEAD linearly extrapolates F(r) &asymp; [F(r<sub>s</sub>)/r<sub>s</sub>]&middot;r on (0, r<sub>s</sub>) via fixed-r MC at r<sub>s</sub>; TAIL uses Pareto MC, r = r<sub>s</sub>(1&minus;u)<sup>&minus;1/&sigma;</sup>. A bare &epsilon;-cutoff would wrongly give (1&minus;&sigma;)&kappa;<sub>&sigma;</sub>&rarr;0 as &sigma;&rarr;1 and is <i>not</i> used. Head bias is O(r<sub>s</sub>).</li>
+        <li><b>Normalization.</b> (1&minus;&sigma;)&kappa;<sub>&sigma;</sub> &rarr; c&#8323;&middot;&kappa;&thinsp;n&#770; with c&#8323; = &pi;&sup2;&radic;2 &asymp; 13.9577 (Zimmerman, <i>The asymptotics of nonlocal curvature for curves</i>, Theorem&nbsp;6.1). Everywhere above this is displayed as the normalized vector &kappa;&#771;<sub>&sigma;</sub> := (1&minus;&sigma;)&kappa;<sub>&sigma;</sub>/c&#8323;, which converges directly to the classical curvature vector &kappa;&thinsp;n&#770; as &sigma;&rarr;1. The results table's "c&#8323; est" row measures |F(r<sub>s</sub>)|/(r<sub>s</sub>&middot;&kappa;) directly against this constant. On the unit circle, exact finite-&sigma; values come from Corollary&nbsp;4.2 (drawn as the gray dash-dot sweep curve, divided by c&#8323;).</li>
+        <li><b>Degenerate discs.</b> Discs with a curve endpoint strictly inside the disc (open curves only) are skipped; endpoints on the rim are measure-zero and handled by strict inequalities.</li>
+        <li><b>Monte Carlo uncertainty.</b> SE = standard error of the estimator mean. Warns when relative SE &gt; 20%.</li>
+        <li><b>&sigma;-sweep plot.</b> The cyan points are measured |&kappa;&#771;<sub>&sigma;</sub>| at 14 &sigma; values spanning [&sigma;<sub>min</sub>, &sigma;<sub>max</sub>] (denser toward &sigma;<sub>max</sub>, N=20k tail per point, seed-fixed); their error bars are the Monte Carlo SE of |&kappa;&#771;<sub>&sigma;</sub>| at each point, propagated from the head and tail sample variances via SE(|v|)&approx;|u&#770;&middot;&epsilon;| with u&#770; the mean direction (the head estimate is cached from the last Compute). The gray dash-dot curve (circle preset only) is Dan's exact finite-&sigma; Corollary&nbsp;4.2 value divided by c&#8323;. The orange dashed line is &kappa;(z), the classical curvature magnitude at the current evaluation point — the &sigma;&rarr;1 limit of |&kappa;&#771;<sub>&sigma;</sub>| (Theorem&nbsp;6.1), redrawn whenever t&#8320; or the curve changes.</li>
+        <li><b>Discrete bookkeeping.</b> Disc&cap;curve counts use the polyline (plus the osculating window at z), not the true curve; raise the polyline resolution for strongly bending custom curves.</li>
+      </ul>
+      <div class="src">Source: B.&nbsp;Seguin, <i>A fractional notion of length and an associated nonlocal curvature</i>, arXiv:1808.08654v6.</div>
+    </details>
+  </div>
+
+</aside>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+
+<!-- mc-core: pure math + chunked Monte Carlo engine. Runs on the main thread AND
+     inside the Web Worker (concatenated into the worker source). No DOM.
+     Normalization: Dan's (1.8) sign order [even - odd] and the sqrt(2) induced-metric
+     factor, so lim_{sigma->1} (1-sigma)kappa_sigma = c_3 kappa n-hat with c_3 = pi^2 sqrt(2)
+     (Dan, Theorem 6.1). -->
+<script id="mc-core">
+'use strict';
+/* --- deterministic RNG (mulberry32) --- */
+function mcRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+var MC_8PI2 = 8 * Math.PI * Math.PI;
+
+/* uniform direction on S^2 */
+function mcRandDir(rand, out) {
+  const u = rand() * 2 - 1, ph = rand() * 6.283185307179586;
+  const s = Math.sqrt(1 - u * u);
+  out[0] = s * Math.cos(ph); out[1] = s * Math.sin(ph); out[2] = u;
+  return out;
+}
+/* uniform direction on the circle perpendicular to a */
+function mcRandPerp(a, rand, out) {
+  let tx = 0, ty = 0, tz = 1;
+  if (Math.abs(a[2]) > 0.9) { tx = 1; ty = 0; tz = 0; }
+  let e1x = a[1] * tz - a[2] * ty, e1y = a[2] * tx - a[0] * tz, e1z = a[0] * ty - a[1] * tx;
+  const n1 = Math.sqrt(e1x * e1x + e1y * e1y + e1z * e1z); e1x /= n1; e1y /= n1; e1z /= n1;
+  const e2x = a[1] * e1z - a[2] * e1y, e2y = a[2] * e1x - a[0] * e1z, e2z = a[0] * e1y - a[1] * e1x;
+  const ph = rand() * 6.283185307179586, cp = Math.cos(ph), sp = Math.sin(ph);
+  out[0] = cp * e1x + sp * e2x; out[1] = cp * e1y + sp * e2y; out[2] = cp * e1z + sp * e2z;
+  return out;
+}
+
+/* Count intersections of the polyline with the OPEN disc (center c, unit normal b, radius r):
+   Seguin's D(p,u,r) = {p+xi.v : xi in [0,r)}: z is on the disc's rim-plane (z-c).b = 0,
+   |z-c| = r, so a strict test |q-c| < r is the definition, not a convenience.
+   pts: Float64Array(x,y,z...), segs: Int32Array(i,j...), dbuf: Float64Array(nP).
+   Per-segment parameter t in [0,1): each plane-crossing is counted exactly once even when
+   it lands on a polyline vertex; a segment lying in the plane (d1 == d2) contributes nothing.
+   The row bracketed by (exA,exB) owns the osculating z-window: rows (skipA,skipB) are
+   absorbed into it and skipped; the window counts one exact crossing from the osculating
+   parabola z + s.T + s^2/2.kCl with s in [sA,sB) instead of chord crossings. The chord
+   interpolation near z is systematically wrong: with the window excluded wholesale, F(rs)
+   degrades by O((h/r)^.8) at fixed mesh h; with the window included as a chord it gains a
+   ~40x parity artifact from the sagitta-interpolated rim crossing. The parabola's second
+   root s1 = -2(b.T)/(kCl.b) reproduces the true curve's wedge crossings to O(h^3); the
+   s = 0 root is z itself, on the rim, and is never counted. */
+function mcDiscCount(cx, cy, cz, bx, by, bz, r, pts, segs, nSeg, dbuf, nP, exA, exB, zx, zy, zz, T, KC, sA, sB, skipA, skipB) {
+  const rE = r * (1 - 1e-9), rE2 = rE * rE;
+  for (let i = 0; i < nP; i++) {
+    const px = pts[3 * i] - cx, py = pts[3 * i + 1] - cy, pz = pts[3 * i + 2] - cz;
+    dbuf[i] = px * bx + py * by + pz * bz;
+  }
+  let count = 0;
+  for (let s = 0; s < nSeg; s++) {
+    const i = segs[2 * s], j = segs[2 * s + 1];
+    if ((i === skipA && j === skipB) || (i === skipB && j === skipA)) continue;  /* absorbed into the osculating z-window */
+    if ((i === exA && j === exB) || (i === exB && j === exA)) {
+      /* the true arc meets the disc plane at z (rim, measure-zero); a plane crossing off z
+         within the window is the second root of s(b.T) + (s^2/2)(kCl.b) = 0 */
+      const tbz = bx * T[0] + by * T[1] + bz * T[2];
+      const kbz = bx * KC[0] + by * KC[1] + bz * KC[2];
+      if (exA >= 0 && Math.abs(kbz) >= 1e-300) {
+        const s1 = -2 * tbz / kbz;      /* nonzero root; the s = 0 root is z, uncounted on the rim */
+        if (s1 !== 0 && s1 >= sA && s1 < sB) {
+          const qx = zx + s1 * T[0] + 0.5 * s1 * s1 * KC[0] - cx;
+          const qy = zy + s1 * T[1] + 0.5 * s1 * s1 * KC[1] - cy;
+          const qz = zz + s1 * T[2] + 0.5 * s1 * s1 * KC[2] - cz;
+          if (qx * qx + qy * qy + qz * qz < rE2) count++;
+        }
+      }
+      continue;
+    }
+    const d1 = dbuf[i], d2 = dbuf[j];
+    const denom = d1 - d2;
+    if (denom === 0) continue;   /* segment in the plane: measure-zero, no counted crossing */
+    const f = d1 / denom;        /* half-open t in [0,1): vertex hits count at t = 0 exactly once */
+    if (f < 0 || f >= 1) continue;
+    const ax = pts[3 * i], ay = pts[3 * i + 1], az = pts[3 * i + 2];
+    const qx = ax + f * (pts[3 * j] - ax) - cx;
+    const qy = ay + f * (pts[3 * j + 1] - ay) - cy;
+    const qz = az + f * (pts[3 * j + 2] - az) - cz;
+    if (qx * qx + qy * qy + qz * qz < rE2) count++;
+  }
+  return count;
+}
+
+/* Same but records intersection points into outPts (flat array). */
+function mcDiscPoints(cx, cy, cz, bx, by, bz, r, pts, segs, nSeg, dbuf, nP, outPts, exA, exB, zx, zy, zz, T, KC, sA, sB, skipA, skipB) {
+  const rE = r * (1 - 1e-9), rE2 = rE * rE;
+  for (let i = 0; i < nP; i++) {
+    const px = pts[3 * i] - cx, py = pts[3 * i + 1] - cy, pz = pts[3 * i + 2] - cz;
+    dbuf[i] = px * bx + py * by + pz * bz;
+  }
+  let count = 0;
+  for (let s = 0; s < nSeg; s++) {
+    const i = segs[2 * s], j = segs[2 * s + 1];
+    if ((i === skipA && j === skipB) || (i === skipB && j === skipA)) continue;  /* absorbed into the osculating z-window */
+    if ((i === exA && j === exB) || (i === exB && j === exA)) {
+      const tbz = bx * T[0] + by * T[1] + bz * T[2];
+      const kbz = bx * KC[0] + by * KC[1] + bz * KC[2];
+      if (exA >= 0 && Math.abs(kbz) >= 1e-300) {
+        const s1 = -2 * tbz / kbz;
+        if (s1 !== 0 && s1 >= sA && s1 < sB) {
+          const qx = zx + s1 * T[0] + 0.5 * s1 * s1 * KC[0];
+          const qy = zy + s1 * T[1] + 0.5 * s1 * s1 * KC[1];
+          const qz = zz + s1 * T[2] + 0.5 * s1 * s1 * KC[2];
+          const dx = qx - cx, dy = qy - cy, dz = qz - cz;
+          if (dx * dx + dy * dy + dz * dz < rE2) { count++; outPts.push(qx, qy, qz); }
+        }
+      }
+      continue;
+    }
+    const d1 = dbuf[i], d2 = dbuf[j];
+    const denom = d1 - d2;
+    if (denom === 0) continue;   /* segment in the plane: measure-zero, no counted crossing */
+    const f = d1 / denom;        /* half-open t in [0,1): vertex hits count at t = 0 exactly once */
+    if (f < 0 || f >= 1) continue;
+    const ax = pts[3 * i], ay = pts[3 * i + 1], az = pts[3 * i + 2];
+    const qx = ax + f * (pts[3 * j] - ax), qy = ay + f * (pts[3 * j + 1] - ay), qz = az + f * (pts[3 * j + 2] - az);
+    const dx = qx - cx, dy = qy - cy, dz = qz - cz;
+    if (dx * dx + dy * dy + dz * dz < rE2) { count++; outPts.push(qx, qy, qz); }
+  }
+  return count;
+}
+
+/* Degenerate-sample test for open curves: a curve endpoint inside the CLOSED disc. */
+function mcEndpointDegenerate(cx, cy, cz, bx, by, bz, r, ev) {
+  const rI = r * (1 - 1e-9);         /* strict interior: rim hits are measure-zero, parity still valid */
+  const rrI = rI * rI;
+  for (let k = 0; k < 6; k += 3) {
+    const wx = ev[k] - cx, wy = ev[k + 1] - cy, wz = ev[k + 2] - cz;
+    const tpar = wx * bx + wy * by + wz * bz;
+    if (Math.abs(tpar) < r * 1e-6) {
+      const qx = wx - tpar * bx, qy = wy - tpar * by, qz = wz - tpar * bz;
+      if (qx * qx + qy * qy + qz * qz < rrI) return true;
+    }
+  }
+  return false;
+}
+
+/* Chunked Monte Carlo engine for HEAD and TAIL parts of kappa_sigma.
+   Odd-only variance reduction: F(r) = 2 . int_{odd, b.t>0} v dmu (the even baseline
+   has exactly zero mean under a -> -a), so we accumulate only odd discs and multiply by 2.
+   cfg = { kind:'head'|'tail', pts, segs, nSeg, nP, closed, ev(null|Float64Array(6)),
+           seed, N, sigma, rs, z:[3], T:[3], collectCloud:bool, cloudN:400 }
+   Head prefilter: a plane-crossing q of D(z+a.rs, b, rs) satisfies |q-z| < 2 rs, so only
+   vertices with |p_i - z| <= 2 rs + maxSegLen can participate. */
+function mcMakeEngine(cfg) {
+  const rand = mcRng(cfg.seed >>> 0);
+  const isHead = cfg.kind === 'head';
+  /* Roll-up constants in Dan's normalization: the odd-only MC measures [Aodd - Aeven]
+     with v = b(a.t) - a(b.t), but Dan's definition (1.8) integrates [Aeven - Aodd], so the
+     vector is negated. Seguin eq. (109) writes the sign-uncorrected odd-minus-even order.
+     On Uperp^2(R^3) with the metric induced from R^6, dH^3(a,b) = sqrt(2).dS^2(a).dS^1_a(b),
+     so the constants also gain a sqrt(2) factor: dH^{2n-2}(a,b,r) = sqrt(2).dS^2.dS^1.dr.
+     Head: -sqrt(2).16pi^2/N . sum_{odd, b.t>0} v = Dan's F(rs). The 16pi^2 = 2.8pi^2
+     odd-only pairing is exact: s.v = 2.1_odd.v - v and the even baseline vanishes by a <-> -a. */
+  const K = isHead ? -Math.SQRT2 * (2 * MC_8PI2) / cfg.N
+  /* Tail: -sqrt(2).16pi^2/(sigma.rs^sigma.N) . sum_{odd, b.t>0} v with r ~ Pareto(rs, sigma),
+     the same odd-only 2.8pi^2 convention; the sigma.rs^sigma factor is the Pareto density. */
+                   : -Math.SQRT2 * (2 * MC_8PI2) / (cfg.sigma * Math.pow(cfg.rs, cfg.sigma) * cfg.N);
+  let pts = cfg.pts, segs = cfg.segs, nSeg = cfg.nSeg, nP = cfg.nP;
+  let exA = (cfg.exA | 0), exB = (cfg.exB | 0);                    /* osculating-window owner row, original numbering */
+  let skipA = ((cfg.skipA === undefined ? -1 : cfg.skipA) | 0), skipB = ((cfg.skipB === undefined ? -1 : cfg.skipB) | 0);
+  let adjA = ((cfg.adjA === undefined ? -1 : cfg.adjA) | 0), adjB = ((cfg.adjB === undefined ? -1 : cfg.adjB) | 0);
+  if (isHead) {
+    let maxSegLen = 0;
+    for (let s = 0; s < cfg.nSeg; s++) {
+      const i = 3 * cfg.segs[2 * s], j = 3 * cfg.segs[2 * s + 1];
+      const dx = cfg.pts[i] - cfg.pts[j], dy = cfg.pts[i + 1] - cfg.pts[j + 1], dz = cfg.pts[i + 2] - cfg.pts[j + 2];
+      const L = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (L > maxSegLen) maxSegLen = L;
+    }
+    const rNeed = 2 * cfg.rs + maxSegLen, rNeed2 = rNeed * rNeed;
+    const slot = new Int32Array(cfg.nP).fill(-1);
+    const near = [];
+    for (let i = 0; i < cfg.nP; i++) {
+      const dx = cfg.pts[3 * i] - cfg.z[0], dy = cfg.pts[3 * i + 1] - cfg.z[1], dz = cfg.pts[3 * i + 2] - cfg.z[2];
+      if (dx * dx + dy * dy + dz * dz <= rNeed2) { slot[i] = near.length; near.push(i); }
+    }
+    pts = new Float64Array(near.length * 3);
+    for (let k = 0; k < near.length; k++) {
+      const i = near[k];
+      pts[3 * k] = cfg.pts[3 * i]; pts[3 * k + 1] = cfg.pts[3 * i + 1]; pts[3 * k + 2] = cfg.pts[3 * i + 2];
+    }
+    const segList = [];
+    for (let s = 0; s < cfg.nSeg; s++) {
+      const a = slot[cfg.segs[2 * s]], b = slot[cfg.segs[2 * s + 1]];
+      if (a >= 0 && b >= 0) segList.push(a, b);
+    }
+    segs = new Int32Array(segList);
+    nSeg = segList.length / 2; nP = near.length;
+    exA = exA >= 0 ? slot[exA] : -1; exB = exB >= 0 ? slot[exB] : -1;
+    if (exA < 0 || exB < 0) { exA = -1; exB = -1; }  /* defensive; z's vertices are inside the near radius */
+    skipA = skipA >= 0 ? slot[skipA] : -1; skipB = skipB >= 0 ? slot[skipB] : -1;
+    if (skipA < 0 || skipB < 0) { skipA = -1; skipB = -1; }
+    adjA = adjA >= 0 ? slot[adjA] : -1; adjB = adjB >= 0 ? slot[adjB] : -1;
+    if (adjA < 0 || adjB < 0) { adjA = -1; adjB = -1; }
+  }
+  const dbuf = new Float64Array(Math.max(nP, 1));
+  const a = [0, 0, 0], b = [0, 0, 0];
+  const T = cfg.T, z = cfg.z, rs = cfg.rs, sigma = cfg.sigma, ev = cfg.ev, closed = cfg.closed;
+  const KC = cfg.kCl || [0, 0, 0];   /* classical curvature vector at z: kCl = kappa.n-hat */
+  let zSA = 0, zSB = 0;              /* osculating-s interval of the z-window */
+  if (exA >= 0 && adjA >= 0 && adjB >= 0) {
+    zSA = (pts[3 * adjA] - z[0]) * T[0] + (pts[3 * adjA + 1] - z[1]) * T[1] + (pts[3 * adjA + 2] - z[2]) * T[2];
+    zSB = (pts[3 * adjB] - z[0]) * T[0] + (pts[3 * adjB + 1] - z[1]) * T[1] + (pts[3 * adjB + 2] - z[2]) * T[2];
+    if (zSA > zSB) { const t0s = zSA; zSA = zSB; zSB = t0s; }
+  }
+  const st = { i: 0, sx: 0, sy: 0, sz: 0, qx: 0, qy: 0, qz: 0, nOdd: 0, nAcc: 0, nSkip: 0 };
+  const collect = !!cfg.collectCloud;
+  const stride = collect ? Math.max(1, Math.floor(cfg.N / (cfg.cloudN || 400))) : Infinity;
+  const cloud = collect ? [] : null;
+  let cloudCap = 0;
+
+  function sample(r) {
+    mcRandDir(rand, a);
+    mcRandPerp(a, rand, b);
+    const at = a[0] * T[0] + a[1] * T[1] + a[2] * T[2];
+    const bt = b[0] * T[0] + b[1] * T[1] + b[2] * T[2];
+    if (bt <= 0) return;                                     /* indicator b.t > 0 */
+    const cx = z[0] + a[0] * r, cy = z[1] + a[1] * r, cz = z[2] + a[2] * r;
+    if (!closed && mcEndpointDegenerate(cx, cy, cz, b[0], b[1], b[2], r, ev)) { st.nSkip++; return; }
+    st.nAcc++;
+    const odd = (mcDiscCount(cx, cy, cz, b[0], b[1], b[2], r, pts, segs, nSeg, dbuf, nP, exA, exB, z[0], z[1], z[2], T, KC, zSA, zSB, skipA, skipB) % 2) === 1;
+    if (collect && st.i % stride === 0 && cloudCap < 400) {
+      const w = Math.pow(r / rs, -1 - sigma);
+      cloud.push(cx, cy, cz, b[0], b[1], b[2], r, odd ? 1 : 0, w);
+      cloudCap++;
+    }
+    if (odd) {
+      st.nOdd++;
+      const vx = b[0] * at - a[0] * bt, vy = b[1] * at - a[1] * bt, vz = b[2] * at - a[2] * bt;
+      st.sx += vx; st.sy += vy; st.sz += vz;
+      st.qx += vx * vx; st.qy += vy * vy; st.qz += vz * vz;
+    }
+  }
+  function step(chunk) {
+    const end = Math.min(st.i + chunk, cfg.N);
+    if (isHead) {
+      for (; st.i < end; st.i++) sample(rs);
+    } else {
+      for (; st.i < end; st.i++) {
+        const r = rs * Math.pow(1 - rand(), -1 / sigma);      /* Pareto: du = sigma . rs^sigma . r^{-1-sigma} dr */
+        sample(r);
+      }
+    }
+    return st.i >= cfg.N;
+  }
+  function frac() { return st.i / cfg.N; }
+  function finish() {
+    const N = cfg.N;
+    const KE = K * N;            /* estimator multiplies the sample MEAN by KE; SE = KE.se(xbar) */
+    const se = [
+      KE * Math.sqrt(Math.max(0, (st.qx - st.sx * st.sx / N) / N) / N),
+      KE * Math.sqrt(Math.max(0, (st.qy - st.sy * st.sy / N) / N) / N),
+      KE * Math.sqrt(Math.max(0, (st.qz - st.sz * st.sz / N) / N) / N)
+    ];
+    const vec = [K * st.sx, K * st.sy, K * st.sz];
+    return {
+      vec: vec, se: se, nOdd: st.nOdd, nAcc: st.nAcc, nSkip: st.nSkip, nAll: N,
+      cloud: collect ? new Float32Array(cloud) : null
+    };
+  }
+  return { step: step, frac: frac, finish: finish, st: st, geo: { nP: nP, nSeg: nSeg } };
+}
+</script>
+<!-- /mc-core -->
+
+<!-- app: UI, scene, worker orchestration -->
+<script>
+'use strict';
+/* ================= state ================= */
+const S = {
+  fn: null, tmin: 0, tmax: 2 * Math.PI, nP: 1200, closed: true, closedManual: null,
+  pts: null, segs: null, nSeg: 0, ev: null, dbuf: null,
+  center: [0, 0, 0], scale: 1,
+  t0: 0, z: [1, 0, 0], T: [0, 1, 0], kCl: [0, 0, 0], kClM: 0, zSeg: [0, 1],
+  zWin: { adjA: 0, adjB: 1, skipA: -1, skipB: -1, sA: 0, sB: 0 },
+  sigma: 0.90, rsFrac: 0.05, rs: 0.05, Nh: 200000, Nt: 60000, Nquick: 20000,
+  thick: 1,   /* appearance multiplier: tube radius and the 3D point sizes
+                   (integrand-cloud rings, disc-explorer intersection dots, z marker) */
+  exTh: 0.25 * Math.PI, exPh: Math.PI, exPsi: 0.37 * 2 * Math.PI,   /* disc explorer true angles */
+  exRR: Math.pow(10, -2.1 + 0.6 * (Math.log10(4) + 2.1)),            /* disc explorer r / scale */
+  Frs: null, FrsSE: null, tail: null, tailSE: null, tailDiag: null,
+  running: false, stale: true, liveSig: true, sweptSigmas: null
+};
+const $ = (id) => document.getElementById(id);
+
+/* ================= worker source (mc-core + driver) ================= */
+const WORKER_DRIVER =
+"self.onmessage = function (e) {\n" +
+"  var msg = e.data;\n" +
+"  if (msg.type !== 'run') return;\n" +
+"  var jobs = msg.jobs, shared = msg.shared, results = [];\n" +
+"  var chunk = msg.chunk || 4000, tlast = 0;\n" +
+"  for (var j = 0; j < jobs.length; j++) {\n" +
+"    var job = jobs[j];\n" +
+"    var eng = mcMakeEngine({\n" +
+"      kind: job.kind, pts: shared.pts, segs: shared.segs, nSeg: shared.nSeg, nP: shared.nP,\n" +
+"      closed: shared.closed, ev: shared.ev, seed: job.seed, N: job.N, sigma: job.sigma,\n" +
+"      rs: job.rs, z: shared.z, T: shared.T, kCl: shared.kCl,\n" +
+"      exA: shared.exA, exB: shared.exB, skipA: shared.skipA, skipB: shared.skipB, adjA: shared.adjA, adjB: shared.adjB,\n" +
+"      collectCloud: !!job.collectCloud, cloudN: 400\n" +
+"    });\n" +
+"    while (!eng.step(chunk)) {\n" +
+"      var now = Date.now();\n" +
+"      if (now - tlast > 150) { tlast = now; self.postMessage({ type: 'progress', job: j, frac: eng.frac() }); }\n" +
+"    }\n" +
+"    var res = eng.finish();\n" +
+"    results.push(res);\n" +
+"    self.postMessage({ type: 'progress', job: j, frac: 1, done: true });\n" +
+"  }\n" +
+"  var transfers = [];\n" +
+"  for (var k = 0; k < results.length; k++) if (results[k].cloud) transfers.push(results[k].cloud.buffer);\n" +
+"  self.postMessage({ type: 'done', results: results }, transfers);\n" +
+"};\n";
+const WORKER_SRC = $('mc-core').textContent + WORKER_DRIVER;
+
+function sharedJobData() {
+  return {
+    pts: S.pts.slice(), segs: S.segs.slice(), nSeg: S.nSeg, nP: S.nP,
+    closed: S.closed, ev: S.ev ? S.ev.slice() : null,
+    z: S.z.slice(), T: S.T.slice(), kCl: S.kCl.slice(),
+    exA: S.zSeg[0], exB: S.zSeg[1], skipA: S.zWin.skipA, skipB: S.zWin.skipB, adjA: S.zWin.adjA, adjB: S.zWin.adjB
+  };
+}
+function runJobsWorker(jobs, shared, token, onP) {
+  return new Promise((resolve, reject) => {
+    let w;
+    try {
+      const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      w = new Worker(url);
+    } catch (err) { reject(err); return; }
+    token.abort = () => { try { w.terminate(); } catch (e) { /* noop */ } resolve(null); };
+    if (token.cancelled) { token.abort(); return; }
+    w.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === 'progress') onP(m.job, m.frac);
+      else if (m.type === 'done') { w.terminate(); resolve(m.results); }
+    };
+    w.onerror = (err) => { try { w.terminate(); } catch (e) { /* noop */ } reject(err || new Error('worker error')); };
+    w.postMessage({ type: 'run', jobs: jobs, shared: shared });
+  });
+}
+function runJobsFallback(jobs, shared, token, onP) {
+  return new Promise((resolve) => {
+    const results = [];
+    let j = 0, eng = null;
+    function pump() {
+      if (token.cancelled) { resolve(null); return; }
+      if (!eng) {
+        const job = jobs[j];
+        eng = mcMakeEngine({
+          kind: job.kind, pts: shared.pts, segs: shared.segs, nSeg: shared.nSeg, nP: shared.nP,
+          closed: shared.closed, ev: shared.ev, seed: job.seed, N: job.N, sigma: job.sigma,
+          rs: job.rs, z: shared.z, T: shared.T, kCl: shared.kCl,
+          exA: shared.exA, exB: shared.exB, skipA: shared.skipA, skipB: shared.skipB, adjA: shared.adjA, adjB: shared.adjB,
+          collectCloud: !!job.collectCloud, cloudN: 400
+        });
+      }
+      const done = eng.step(jobs[j].kind === 'head' ? 20000 : 4000);
+      onP(j, eng.frac());
+      if (done) { results.push(eng.finish()); j++; eng = null; }
+      if (j >= jobs.length) { resolve(results); return; }
+      setTimeout(pump, 0);
+    }
+    pump();
+  });
+}
+async function runJobs(jobs, shared, token, onP) {
+  try { return await runJobsWorker(jobs, shared, token, onP); }
+  catch (e) { return await runJobsFallback(jobs, shared, token, onP); }
+}
+
+/* ================= expression parser (safe, recursive descent) ================= */
+const EXPR_FUNS = {
+  sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
+  sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh,
+  exp: Math.exp, log: Math.log, log10: Math.log10, sqrt: Math.sqrt, cbrt: Math.cbrt,
+  abs: Math.abs, floor: Math.floor, ceil: Math.ceil, sign: Math.sign, min: Math.min, max: Math.max,
+  'if': (c, a, b) => (c !== 0 ? a : b)   /* piecewise: if(t==0, 0, t^5*sin(1/t)) */
+};
+function tokenize(src) {
+  const toks = []; let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    if (/[0-9.]/.test(ch)) {
+      const mm = src.slice(i).match(/^([0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)/);
+      if (!mm) throw new Error('Bad number near "' + src.slice(i, i + 8) + '"');
+      toks.push({ t: 'num', v: parseFloat(mm[1]) }); i += mm[1].length; continue;
+    }
+    if (/[A-Za-z_]/.test(ch)) {
+      const mm = src.slice(i).match(/^([A-Za-z_][A-Za-z0-9_]*)/);
+      toks.push({ t: 'id', v: mm[1] }); i += mm[1].length; continue;
+    }
+    if ('<>=!'.indexOf(ch) >= 0) {
+      const two = src.slice(i, i + 2);
+      if (two === '==' || two === '!=' || two === '<=' || two === '>=') { toks.push({ t: 'op', v: two }); i += 2; continue; }
+      if (ch === '<' || ch === '>') { toks.push({ t: 'op', v: ch }); i++; continue; }
+      throw new Error('Unexpected character "' + ch + '"');
+    }
+    if ('+-*/^(),'.indexOf(ch) >= 0) { toks.push({ t: 'op', v: ch }); i++; continue; }
+    throw new Error('Unexpected character "' + ch + '"');
+  }
+  return toks;
+}
+function parseExpr(src) {
+  const toks = tokenize(src); let pos = 0;
+  const peek = () => toks[pos];
+  const next = () => toks[pos++];
+  /* Comparisons bind looser than +/-, tighter than commas, left-associative:
+     t^5*2==0 parses as (t^5*2)==0. Each comparison evaluates to 1 (true) or 0 (false). */
+  const CMP_OPS = { '==': (a, b) => a === b ? 1 : 0, '!=': (a, b) => a !== b ? 1 : 0,
+    '<=': (a, b) => a <= b ? 1 : 0, '>=': (a, b) => a >= b ? 1 : 0,
+    '<': (a, b) => a < b ? 1 : 0, '>': (a, b) => a > b ? 1 : 0 };
+  function parseC() {
+    let f = parseE();
+    while (peek() && peek().t === 'op' && CMP_OPS[peek().v]) {
+      const op = next().v, g = parseE(), fh = f, fn = CMP_OPS[op];
+      f = (t) => fn(fh(t), g(t));
+    }
+    return f;
+  }
+  function parseE() {
+    let f = parseT();
+    while (peek() && peek().t === 'op' && (peek().v === '+' || peek().v === '-')) {
+      const op = next().v, g = parseT(), fh = f;
+      f = op === '+' ? ((t) => fh(t) + g(t)) : ((t) => fh(t) - g(t));
+    }
+    return f;
+  }
+  function parseT() {
+    let f = parseU();
+    for (;;) {
+      const tk = peek();
+      if (tk && tk.t === 'op' && (tk.v === '*' || tk.v === '/')) {
+        const op = next().v, g = parseU(), fh = f;
+        f = op === '*' ? ((t) => fh(t) * g(t)) : ((t) => fh(t) / g(t));
+      } else if (tk && ((tk.t === 'num') || (tk.t === 'id') || (tk.t === 'op' && tk.v === '('))) {
+        /* juxtaposition = implicit multiplication: 2t, t^5 sin(1/t), 2(3+4), (a+b)(c+d).
+           Safe w.r.t. function calls because parseA consumes "name(args)" atomically:
+           a fresh token here can only start an already-complete new factor, and parseU
+           consumes at least one token, so this always makes progress. */
+        const g = parseU(), fh = f;
+        f = (t) => fh(t) * g(t);
+      } else return f;
+    }
+  }
+  function parseF() {
+    const f = parseA();
+    if (peek() && peek().t === 'op' && peek().v === '^') { next(); const g = parseU(); return (t) => Math.pow(f(t), g(t)); }
+    return f;
+  }
+  function parseU() {
+    if (peek() && peek().t === 'op' && (peek().v === '-' || peek().v === '+')) {
+      const op = next().v, f = parseU();
+      return op === '-' ? ((t) => -f(t)) : f;
+    }
+    return parseF();
+  }
+  function parseA() {
+    const tk = next();
+    if (!tk) throw new Error('Unexpected end of expression');
+    if (tk.t === 'num') { const v = tk.v; return () => v; }
+    if (tk.t === 'id') {
+      const name = tk.v.toLowerCase();
+      if (name === 't') return (t) => t;
+      if (name === 'pi') return () => Math.PI;
+      if (name === 'e') return () => Math.E;
+      const fn = EXPR_FUNS[name];
+      if (!fn) throw new Error('Unknown symbol "' + tk.v + '"');
+      const p = next();
+      if (!p || p.t !== 'op' || p.v !== '(') throw new Error('Expected ( after "' + tk.v + '"');
+      const args = [];
+      if (!(peek() && peek().t === 'op' && peek().v === ')')) {
+        args.push(parseC());
+        while (peek() && peek().t === 'op' && peek().v === ',') { next(); args.push(parseC()); }
+      }
+      const c = next();
+      if (!c || c.t !== 'op' || c.v !== ')') throw new Error('Expected )');
+      return (t) => fn.apply(null, args.map((a) => a(t)));
+    }
+    if (tk.t === 'op' && tk.v === '(') {
+      const f = parseC();
+      const c = next();
+      if (!c || c.t !== 'op' || c.v !== ')') throw new Error('Expected )');
+      return f;
+    }
+    throw new Error('Unexpected "' + tk.v + '"');
+  }
+  if (toks.length === 0) throw new Error('Empty expression');
+  const f = parseC();   /* entry: comparisons bind loosest; parens and args route through parseC too */
+  if (pos < toks.length) throw new Error('Unexpected "' + toks[pos].v + '"');
+  return f;
+}
+
+/* ================= curves ================= */
+const PRESETS = {
+  circle:  { fn: (t) => [Math.cos(t), Math.sin(t), 0], tmin: -Math.PI, tmax: Math.PI },
+  trefoil: { fn: (t) => [Math.sin(t) + 2 * Math.sin(2 * t), Math.cos(t) - 2 * Math.cos(2 * t), -Math.sin(3 * t)], tmin: -Math.PI, tmax: Math.PI },
+  helix:   { fn: (t) => [Math.cos(t), Math.sin(t), 0.3 * t], tmin: -8 * Math.PI, tmax: 8 * Math.PI },
+  line:    { fn: (t) => [t, 0, 0], tmin: -3, tmax: 3 }
+};
+function evalVec(fn, t) {
+  const p = fn(t);
+  if (!p || p.length !== 3 || !isFinite(p[0]) || !isFinite(p[1]) || !isFinite(p[2]))
+    throw new Error('Curve returned non-finite value at t = ' + t);
+  return p;
+}
+
+/* ================= formatting ================= */
+function fmt(x) {
+  if (x === undefined || x === null || !isFinite(x)) return '—';
+  if (x === 0) return '0';
+  const ax = Math.abs(x);
+  if (ax >= 1e5 || ax < 1e-3) return x.toExponential(3).replace('e', '×10^');
+  return x.toFixed(4);
+}
+function fmtV(v) { return '(' + fmt(v[0]) + ', ' + fmt(v[1]) + ', ' + fmt(v[2]) + ')'; }
+function fmtSE(v) { return '(' + fmt(v[0]) + ', ' + fmt(v[1]) + ', ' + fmt(v[2]) + ')'; }
+/* sigma display: shortest exact round-trip print, i.e. full double precision —
+   0.9999, 0.99999, 0.9999999… all print exactly, never as "1.00" */
+function fmtSig(s) {
+  if (!isFinite(s)) return '—';
+  return String(s);
+}
+function vnorm(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+function seNorm(v, se) {
+  const m = vnorm(v);
+  if (!(m > 1e-300)) return vnorm(se);
+  const dx = (v[0] / m) * se[0], dy = (v[1] / m) * se[1], dz = (v[2] / m) * se[2];
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+</script>
+<script>
+'use strict';
+/* ================= curve building + classical geometry ================= */
+function markStale() { S.stale = true; $('stale').classList.add('show'); }
+function clearStale() { S.stale = false; $('stale').classList.remove('show'); }
+
+function buildCurve() {
+  const preset = $('preset').value;
+  let fn, tmin, tmax;
+  $('curveerr').style.display = 'none';
+  try {
+    if (preset === 'custom') {
+      const fx = parseExpr($('fx').value), fy = parseExpr($('fy').value), fz = parseExpr($('fz').value);
+      fn = (t) => [fx(t), fy(t), fz(t)];
+      tmin = parseFloat($('tmin').value); tmax = parseFloat($('tmax').value);
+      if (!isFinite(tmin) || !isFinite(tmax) || tmax <= tmin) throw new Error('Need tmin < tmax, both finite.');
+    } else {
+      fn = PRESETS[preset].fn; tmin = PRESETS[preset].tmin; tmax = PRESETS[preset].tmax;
+    }
+    const nP = parseInt($('npts').value, 10) || 1200;
+    S.fn = fn; S.tmin = tmin; S.tmax = tmax; S.nP = nP; S.presetKey = preset;
+    // auto-detect closed
+    const a = evalVec(fn, tmin), b = evalVec(fn, tmax);
+    const span = 1 + Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+    const autoClosed = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-9 * span;
+    if (S.closedManual === null) { S.closed = autoClosed; $('closed').checked = autoClosed; }
+    else S.closed = S.closedManual;
+    $('closedauto').textContent = 'auto: ' + (autoClosed ? 'closed' : 'open');
+    // polyline
+    const pts = new Float64Array(nP * 3);
+    for (let i = 0; i < nP; i++) {
+      let t;
+      if (S.closed) t = tmin + (tmax - tmin) * i / nP;
+      else t = nP === 1 ? tmin : tmin + (tmax - tmin) * i / (nP - 1);
+      const p = evalVec(fn, t);
+      pts[3 * i] = p[0]; pts[3 * i + 1] = p[1]; pts[3 * i + 2] = p[2];
+    }
+    const nSeg = S.closed ? nP : nP - 1;
+    const segs = new Int32Array(nSeg * 2);
+    for (let s = 0; s < nSeg; s++) { segs[2 * s] = s; segs[2 * s + 1] = (s + 1) % nP; }
+    S.pts = pts; S.segs = segs; S.nSeg = nSeg; S.dbuf = new Float64Array(Math.max(nP, 1));
+    S.ev = S.closed ? null :
+      new Float64Array([pts[0], pts[1], pts[2], pts[3 * nP - 3], pts[3 * nP - 2], pts[3 * nP - 1]]);
+    // bbox / scale / center
+    let mnx = 1e100, mnz = 1e100, mny = 1e100, mxx = -1e100, mxy = -1e100, mxz = -1e100;
+    for (let i = 0; i < nP; i++) {
+      const x = pts[3 * i], y = pts[3 * i + 1], z = pts[3 * i + 2];
+      if (x < mnx) mnx = x; if (x > mxx) mxx = x;
+      if (y < mny) mny = y; if (y > mxy) mxy = y;
+      if (z < mnz) mnz = z; if (z > mxz) mxz = z;
+    }
+    S.center = [(mnx + mxx) / 2, (mny + mxy) / 2, (mnz + mxz) / 2];
+    S.scale = Math.max(1e-9, Math.hypot(mxx - mnx, mxy - mny, mxz - mnz) / 2);
+    S.rs = S.rsFrac * S.scale;
+  } catch (err) {
+    $('curveerr').textContent = err.message; $('curveerr').style.display = 'block';
+    return false;
+  }
+  setT0(S.t0, true);
+  sliderFromT0(); // thumb must follow the clamped t0 on preset switches
+  sceneRebuildCurve();
+  updateRsLabel(); syncExControls(); syncClosedUI();
+  markStale();
+  return true;
+}
+/* Segment bracketing z and its osculating z-window. Every disc plane passes through z
+   (b.(z-c)=0) with z exactly on the disc rim, so the counts near z are the delicate part:
+   - excluding the z-bracketing segment wholesale loses the wedge crossings and costs
+     O((h/r)^.8) of F(rs) at fixed mesh size h (~7% at defaults);
+   - counting it as a chord injects a ~40x parity artifact when z is off-vertex, because the
+     chord-interpolated plane crossing lands strictly inside the disc (sagitta).
+   Instead the z-window is counted from the osculating parabola z + s.T + s^2/2.kCl, exact
+   to O(h^3): when z is an exact polyline vertex the window spans both adjacent segments
+   [v-1, v+1] and the incoming row is skipped; otherwise it is the single z-bracketing
+   segment. sA/sB are the window's endpoints in the osculating-s parameter (z at s = 0).
+   The true crossing at z sits on the rim and is boundary-excluded by the strict |q-c| < r
+   test, consistent with the exact-vertex count from the remaining chord rows. */
+function syncZSeg() {
+  const span = S.tmax - S.tmin;
+  const dt = S.closed ? span / S.nP : span / Math.max(1, S.nP - 1);
+  let iZ = dt > 0 ? Math.floor((S.t0 - S.tmin) / dt) : 0;
+  if (iZ < 0) iZ = 0;
+  if (iZ >= S.nSeg) iZ = S.nSeg - 1;
+  S.zSeg = S.segs ? [S.segs[2 * iZ], S.segs[2 * iZ + 1]] : [0, 1];
+  const za = S.zSeg[0], zb = S.zSeg[1];
+  let adjA = za, adjB = zb, skipA = -1, skipB = -1;
+  if (S.pts) {
+    const tol = 1e-13;
+    const dA = (S.pts[3 * za] - S.z[0]) ** 2 + (S.pts[3 * za + 1] - S.z[1]) ** 2 + (S.pts[3 * za + 2] - S.z[2]) ** 2;
+    const dB = (S.pts[3 * zb] - S.z[0]) ** 2 + (S.pts[3 * zb + 1] - S.z[1]) ** 2 + (S.pts[3 * zb + 2] - S.z[2]) ** 2;
+    let v = -1;
+    if (dA < tol * tol) v = za; else if (dB < tol * tol) v = zb;
+    if (v >= 0) {
+      if (S.closed) { adjA = (v - 1 + S.nP) % S.nP; adjB = (v + 1) % S.nP; skipA = (v - 1 + S.nP) % S.nP; skipB = v; }
+      else if (v > 0 && v < S.nP - 1) { adjA = v - 1; adjB = v + 1; skipA = v - 1; skipB = v; }
+      /* endpoints of an open curve keep the single-sided window */
+    }
+  }
+  let sA = 0, sB = 0;
+  const Tz = S.T;
+  if (S.pts && Tz[0] === Tz[0] && Tz[1] === Tz[1] && Tz[2] === Tz[2]) {
+    sA = (S.pts[3 * adjA] - S.z[0]) * Tz[0] + (S.pts[3 * adjA + 1] - S.z[1]) * Tz[1] + (S.pts[3 * adjA + 2] - S.z[2]) * Tz[2];
+    sB = (S.pts[3 * adjB] - S.z[0]) * Tz[0] + (S.pts[3 * adjB + 1] - S.z[1]) * Tz[1] + (S.pts[3 * adjB + 2] - S.z[2]) * Tz[2];
+    if (sA > sB) { const tmp = sA; sA = sB; sB = tmp; }
+  }
+  S.zWin = { adjA: adjA, adjB: adjB, skipA: skipA, skipB: skipB, sA: sA, sB: sB };
+}
+function setT0(t0, clamp) {
+  $('t0err').classList.remove('show');
+  if (clamp) t0 = Math.min(Math.max(t0, S.tmin), S.tmax);
+  S.t0 = t0;
+  // classical curvature from gamma', gamma'' (central differences; wrapped when closed)
+  const span = S.tmax - S.tmin;
+  const h = Math.min(span / 2000, 1e-2);
+  const f0 = S.fn(t0);
+  let gp, gpp;
+  if (S.closed) {
+    const tm = t0 - h < S.tmin ? t0 - h + span : t0 - h;
+    const tp = t0 + h > S.tmax ? t0 + h - span : t0 + h;
+    const fp = S.fn(tp), fm = S.fn(tm);
+    gp = [(fp[0] - fm[0]) / (2 * h), (fp[1] - fm[1]) / (2 * h), (fp[2] - fm[2]) / (2 * h)];
+    gpp = [(fp[0] - 2 * f0[0] + fm[0]) / (h * h), (fp[1] - 2 * f0[1] + fm[1]) / (h * h), (fp[2] - 2 * f0[2] + fm[2]) / (h * h)];
+  } else {
+    const hTrail = (t0 - S.tmin) / 2.05, hLead = (S.tmax - t0) / 2.05;
+    if (hTrail >= h && hLead >= h) {
+      const fp = S.fn(t0 + h), fm = S.fn(t0 - h);
+      gp = [(fp[0] - fm[0]) / (2 * h), (fp[1] - fm[1]) / (2 * h), (fp[2] - fm[2]) / (2 * h)];
+      gpp = [(fp[0] - 2 * f0[0] + fm[0]) / (h * h), (fp[1] - 2 * f0[1] + fm[1]) / (h * h), (fp[2] - 2 * f0[2] + fm[2]) / (h * h)];
+    } else if (hLead >= hTrail) {
+      const hh = Math.min(h, Math.max(hLead, 1e-12));
+      const fp1 = S.fn(t0 + hh), fp2 = S.fn(t0 + 2 * hh);
+      gp = [(fp1[0] - f0[0]) / hh, (fp1[1] - f0[1]) / hh, (fp1[2] - f0[2]) / hh];
+      gpp = [(fp2[0] - 2 * fp1[0] + f0[0]) / (hh * hh), (fp2[1] - 2 * fp1[1] + f0[1]) / (hh * hh), (fp2[2] - 2 * fp1[2] + f0[2]) / (hh * hh)];
+    } else {
+      const hh = Math.min(h, Math.max(hTrail, 1e-12));
+      const fm1 = S.fn(t0 - hh), fm2 = S.fn(t0 - 2 * hh);
+      gp = [(f0[0] - fm1[0]) / hh, (f0[1] - fm1[1]) / hh, (f0[2] - fm1[2]) / hh];
+      gpp = [(f0[0] - 2 * fm1[0] + fm2[0]) / (hh * hh), (f0[1] - 2 * fm1[1] + fm2[1]) / (hh * hh), (f0[2] - 2 * fm1[2] + fm2[2]) / (hh * hh)];
+    }
+  }
+  const sp = Math.sqrt(gp[0] * gp[0] + gp[1] * gp[1] + gp[2] * gp[2]);
+  const s2 = sp * sp;
+  if (!(sp > 1e-12)) {
+    S.kCl = [NaN, NaN, NaN]; S.kClM = NaN; S.T = [NaN, NaN, NaN]; S.z = f0.slice();
+    $('t0v').textContent = fmt(t0); $('t0n').value = fmtSig(t0); $('zv').value = fmtV(S.z);
+    syncZSeg(); drawSweep();
+    return;
+  }
+  const d = (gp[0] * gpp[0] + gp[1] * gpp[1] + gp[2] * gpp[2]) / s2;
+  S.kCl = [(gpp[0] - gp[0] * d) / s2, (gpp[1] - gp[1] * d) / s2, (gpp[2] - gp[2] * d) / s2];
+  S.kClM = vnorm(S.kCl);
+  S.T = [gp[0] / sp, gp[1] / sp, gp[2] / sp];
+  S.z = f0.slice();
+  $('t0v').textContent = fmt(t0);
+  $('t0n').value = fmtSig(t0);
+  $('zv').value = fmtV(S.z);
+  syncZSeg();
+  sceneUpdateZ();
+  explorerUpdate();
+  drawSweep();   // the κ(z) reference line tracks the evaluation point
+}
+
+/* ================= Three.js scene ================= */
+const DARK = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+const PAL = DARK ? { tube: 0x8fa3bd, line: 0x9db2cc, grid: 0x2a3340, tangent: 0xd8dee6,
+                     green: 0x3fd968, orange: 0xff9f43, cyan: 0x48d9e3, magenta: 0xe05ce0,
+                     red: 0xff6b5e, blue: 0x6b9cff, fill: 0x8fa3bd }
+                 : { tube: 0x51637d, line: 0x6a7f99, grid: 0xccd4de, tangent: 0x41505f,
+                     green: 0x1f9d44, orange: 0xc96a12, cyan: 0x0e7c85, magenta: 0xa820a8,
+                     red: 0xd33f2f, blue: 0x2f6bd8, fill: 0x51637d };
+let TH = null;    // three context
+let tagExplorer, tagKeyA, tagKeyC;
+
+function initThree() {
+  if (typeof THREE === 'undefined') { $('no3d').classList.add('show'); return; }
+  const container = $('viewport');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  container.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, DARK ? 0.9 : 1.0));
+  const dl = new THREE.DirectionalLight(0xffffff, DARK ? 0.9 : 0.7);
+  dl.position.set(3, 4, 2); scene.add(dl);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+  TH = { renderer, scene, camera, dom: renderer.domElement, cloud: null,
+         tubeMesh: null, zMarker: null, endMarks: [], arrows: {}, grid: null,
+         discGroup: null, frame: 0, orbit: null };
+  new ResizeObserver(() => resizeThree()).observe($('viewwrap'));
+  resizeThree();
+  tagExplorer = document.createElement('div'); tagExplorer.className = 'tag'; $('labels').appendChild(tagExplorer);
+  tagKeyA = document.createElement('div'); tagKeyA.className = 'tag kdim'; $('labels').appendChild(tagKeyA);
+  tagKeyC = document.createElement('div'); tagKeyC.className = 'tag kdim'; $('labels').appendChild(tagKeyC);
+  initOrbit();
+  animate();
+}
+function resizeThree() {
+  if (!TH) return;
+  const w = $('viewwrap').clientWidth, h = $('viewwrap').clientHeight;
+  if (w < 2 || h < 2) return;
+  TH.renderer.setSize(w, h);
+  TH.camera.aspect = w / h;
+  TH.camera.updateProjectionMatrix();
+}
+
+/* minimal orbit controls: drag rotate, wheel zoom, right/shift-drag pan, pinch */
+function initOrbit() {
+  const dom = TH.dom, cam = TH.camera;
+  const o = { th: 0.85, ph: 1.08, r: 3.2 * S.scale, t: new THREE.Vector3(...S.center), autorot: false };
+  TH.orbit = o;
+  const TAU = Math.PI * 2;
+  const wrapAng = (a) => { a %= TAU; return a < 0 ? a + TAU : a; }; // orientation is 2π-periodic; keep angles bounded
+  function apply() {
+    const thn = wrapAng(o.th), phn = wrapAng(o.ph);
+    const sp = Math.sin(phn), x = o.r * sp * Math.cos(thn), y = o.r * Math.cos(phn), z = o.r * sp * Math.sin(thn);
+    // Free vertical orbit: no polar clamp. Flip the up reference at each pole (where
+    // lookAt is degenerate anyway) so the view sweeps continuously over the top and
+    // under the bottom instead of rolling 180° across the pole.
+    cam.up.set(0, phn < Math.PI ? 1 : -1, 0);
+    cam.position.set(o.t.x + x, o.t.y + y, o.t.z + z);
+    cam.lookAt(o.t);
+    cam.near = o.r / 200; cam.far = o.r * 200; cam.updateProjectionMatrix();
+  }
+  o.apply = apply;
+  const ptrs = new Map();
+  let panMode = false, lastPinch = 0;
+  function panBy(dx, dy) {
+    const s = o.r * 0.0016;
+    const fwd = new THREE.Vector3(); cam.getWorldDirection(fwd);
+    const right = new THREE.Vector3().crossVectors(fwd, cam.up).normalize();
+    const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
+    o.t.addScaledVector(right, -dx * s); o.t.addScaledVector(up, dy * s);
+    apply();
+  }
+  dom.addEventListener('pointerdown', (e) => {
+    dom.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    panMode = (e.button === 2) || e.shiftKey;
+    if (ptrs.size === 2) { const p = [...ptrs.values()]; lastPinch = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); }
+  });
+  dom.addEventListener('pointermove', (e) => {
+    const p = ptrs.get(e.pointerId); if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    if (ptrs.size === 2) {
+      const q = [...ptrs.values()];
+      const d = Math.hypot(q[0].x - q[1].x, q[0].y - q[1].y);
+      if (lastPinch > 0) o.r = Math.min(Math.max(o.r * lastPinch / d, 0.25 * S.scale), 20 * S.scale);
+      lastPinch = d; panBy(dx / 2, dy / 2); apply(); return;
+    }
+    if (panMode) panBy(dx, dy);
+    else {
+      o.th -= dx * 0.0055; o.ph -= dy * 0.0055; // no polar bounds: orbit fully over the top / under the bottom
+      apply();
+    }
+  });
+  const up = (e) => { ptrs.delete(e.pointerId); lastPinch = 0; };
+  dom.addEventListener('pointerup', up); dom.addEventListener('pointercancel', up);
+  dom.addEventListener('wheel', (e) => { e.preventDefault(); o.r = Math.min(Math.max(o.r * Math.exp(e.deltaY * 0.0012), 0.2 * S.scale), 20 * S.scale); apply(); }, { passive: false });
+  // Non-passive touch guards: the browser must not hijack pinch/drag on the 3D graph
+  // for page zoom/scroll; one-finger orbit and two-finger pinch dolly are handled
+  // above via pointer events (pointerdown/move/up fire regardless of this).
+  $('viewport').addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
+  $('viewport').addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+  dom.addEventListener('contextmenu', (e) => e.preventDefault());
+  apply();
+}
+function retargetOrbit() {
+  if (!TH) return;
+  const o = TH.orbit;
+  o.t.set(S.center[0], S.center[1], S.center[2]);
+  o.r = Math.min(Math.max(o.r, 0.6 * S.scale), 12 * S.scale);
+  o.apply();
+}
+
+function disposeObj(obj) {
+  obj.traverse((c) => {
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) { (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => m.dispose && m.dispose()); }
+  });
+}
+/* The curve tube alone: rebuilt live by the thickness control without touching
+   the MC results, and by sceneRebuildCurve when the curve itself changes. */
+function buildTubeMesh() {
+  if (!TH || !S.pts) return;
+  const sc = TH.scene, scale = S.scale;
+  if (TH.tubeMesh) { sc.remove(TH.tubeMesh); disposeObj(TH.tubeMesh); TH.tubeMesh = null; }
+  // subsample polyline for the tube path
+  const step = Math.max(1, Math.floor(S.nP / 600));
+  const pts = [];
+  for (let i = 0; i < S.nP; i += step) pts.push(new THREE.Vector3(S.pts[3 * i], S.pts[3 * i + 1], S.pts[3 * i + 2]));
+  if (!S.closed && (S.nP - 1) % step !== 0)
+    pts.push(new THREE.Vector3(S.pts[3 * S.nP - 3], S.pts[3 * S.nP - 2], S.pts[3 * S.nP - 1]));
+  const curve = new THREE.CatmullRomCurve3(pts, S.closed, 'centripetal');
+  const tubeR = 0.007 * scale * S.thick;   /* S.thick = 1 reproduces the old default look */
+  const geo = new THREE.TubeGeometry(curve, Math.min(700, Math.max(200, pts.length * 2)), tubeR, 10, S.closed);
+  TH.tubeMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: PAL.tube, roughness: 0.55, metalness: 0.1 }));
+  sc.add(TH.tubeMesh);
+}
+/* The Appearance thickness multiplier, applied live: the curve tube plus the three
+   3D point families (z marker, disc-explorer intersection dots, integrand-cloud rings)
+   all scale with the same multiplier S.thick. Geometry only — no MC recompute. */
+function applyThickness() {
+  if (!TH) return;
+  buildTubeMesh();
+  if (TH.zMarker) TH.zMarker.scale.setScalar(S.thick);
+  if ($('vdisc').checked) drawExplorer(EX.outPts || []);   /* reuses cached intersections; no recompute */
+  if (S.results && S.results.cloud) buildCloud(S.results.cloud, S.sigma, S.rs);
+}
+function sceneRebuildCurve() {
+  if (!TH) return;
+  const sc = TH.scene, scale = S.scale;
+  if (TH.grid) { sc.remove(TH.grid); disposeObj(TH.grid); TH.grid = null; }
+  TH.endMarks.forEach((m) => { sc.remove(m); disposeObj(m); }); TH.endMarks = [];
+  buildTubeMesh();   /* tube geometry only; the MC results stay put */
+  const grid = new THREE.GridHelper(4 * scale, 24, PAL.grid, PAL.grid);
+  grid.position.set(S.center[0], S.center[1] - 1.15 * scale, S.center[2]);
+  grid.material.transparent = true; grid.material.opacity = 0.35;
+  sc.add(grid); TH.grid = grid;
+  if (!S.closed) {
+    const g = new THREE.SphereGeometry(0.016 * scale, 16, 12);
+    const m = new THREE.MeshStandardMaterial({ color: PAL.fill, roughness: 0.6 });
+    for (const e of [[S.pts[0], S.pts[1], S.pts[2]], [S.pts[3 * S.nP - 3], S.pts[3 * S.nP - 2], S.pts[3 * S.nP - 1]]]) {
+      const s = new THREE.Mesh(g, m); s.position.set(e[0], e[1], e[2]); sc.add(s); TH.endMarks.push(s);
+    }
+  }
+  if (!TH.zMarker) {
+    TH.zMarker = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14),
+      new THREE.MeshStandardMaterial({ color: DARK ? 0xf2f5f8 : 0x1a2230, roughness: 0.35 }));
+    sc.add(TH.zMarker);
+  }
+  TH.zMarker.geometry.dispose();
+  TH.zMarker.geometry = new THREE.SphereGeometry(0.02 * scale, 20, 14);
+  TH.zMarker.scale.setScalar(S.thick);   /* the appearance multiplier applies to the z marker too */
+  sceneUpdateZ();
+  buildArrows();
+  retargetOrbit();
+}
+function sceneUpdateZ() {
+  if (!TH || !TH.zMarker) return;
+  TH.zMarker.position.set(S.z[0], S.z[1], S.z[2]);
+  buildArrows();
+}
+function arrowOf(colorHex, len, label) {
+  const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), len, colorHex, 0.09 * len + 0.02 * S.scale, 0.035 * len + 0.008 * S.scale);
+  a.line.material.linewidth = 2;
+  return a;
+}
+function buildArrows() {
+  if (!TH) return;
+  const sc = TH.scene, scale = S.scale;
+  Object.values(TH.arrows).forEach((a) => { sc.remove(a); disposeObj(a); });
+  TH.arrows = {};
+  if (!$('varrows').checked) { updateKeyLabels(); return; }
+  const z3 = new THREE.Vector3(S.z[0], S.z[1], S.z[2]);
+  const L = 0.32 * scale;
+  const T = new THREE.Vector3(...S.T);
+  const mT = T.length();
+  const ar = {};
+  if (mT > 1e-12) {
+    ar.T = new THREE.ArrowHelper(T.clone().normalize(), z3, 0.45 * L, PAL.tangent, 0.05 * scale, 0.022 * scale);
+    sc.add(ar.T);
+  }
+  const mC = S.kClM;
+  const R = S.results;
+  if (mC > 1e-12 || (R && vnorm(R.kappa) > 1e-12)) {
+    // classical kappa and tilde-kappa_sigma (=(1-sigma)kappa_sigma/c3) share one scale
+    let mN = 0, nVec = null, mNSE = 0;
+    if (R) { nVec = new THREE.Vector3(R.kappaScaled[0] / C3, R.kappaScaled[1] / C3, R.kappaScaled[2] / C3); mN = nVec.length(); mNSE = seNorm(R.kappaScaled.map((v) => v / C3), R.kappaScaledSE.map((v) => v / C3)); }
+    let sc1 = 0;
+    if (mC > 1e-12) { sc1 = L / Math.max(mC, mN / 4); }
+    else if (mN > 1e-12) { sc1 = L / mN; }
+    const cap = 3.2 * L;
+    if (mC > 1e-12) {
+      const len = Math.min(mC * sc1, cap);
+      const dirC = new THREE.Vector3(...S.kCl).normalize();
+      ar.C = new THREE.ArrowHelper(dirC, z3, len, PAL.green, 0.045 * scale + 0.06 * len, 0.02 * scale + 0.02 * len);
+      ar.C.userData = { true: mC, scale: sc1, clen: len, dir: dirC };
+      sc.add(ar.C);
+    }
+    if (nVec && mN > 1e-12) {
+      const len = Math.min(mN * sc1, cap);
+      const dirN = nVec.clone().normalize();
+      ar.N = new THREE.ArrowHelper(dirN, z3, len, PAL.cyan, 0.045 * scale + 0.06 * len, 0.02 * scale + 0.02 * len);
+      ar.N.userData = { true: mN, scale: sc1, clen: len, dir: dirN, se: mNSE };
+      sc.add(ar.N);
+    }
+    if (R) {
+      const k = new THREE.Vector3(...R.kappa), mK = k.length();
+      if (mK > 1e-12) {
+        const scN = L / mK;  // own auto-scale
+        const dirK = k.clone().normalize();
+        ar.K = new THREE.ArrowHelper(dirK, z3, L, PAL.orange, 0.045 * scale + 0.06 * L, 0.02 * scale + 0.02 * L);
+        ar.K.userData = { true: mK, scale: scN, clen: L, dir: dirK, se: seNorm(R.kappa, R.kappaSE) };
+        sc.add(ar.K);
+      }
+    }
+  }
+  TH.arrows = ar;
+  updateKeyLabels();
+}
+function updateKeyLabels() {
+  if (!tagKeyA) return;
+  const R = S.results;
+  const show = $('vlen').checked && R && TH && TH.arrows;
+  tagKeyA.style.display = show && TH.arrows.N ? 'block' : 'none';
+  tagKeyC.style.display = show && TH.arrows.K ? 'block' : 'none';
+}
+</script>
+<script>
+'use strict';
+/* ================= disc explorer + cloud rendering ================= */
+const EX = { a: [1, 0, 0], b: [0, 0, 1], c: [1.5, 0, 0], r: 0.5, count: 0, odd: false, btOk: false, s: 0, v: [0, 0, 0], endHit: false, outPts: [] };
+/* The disc explorer's true computation values live on S: exTh/exPh/exPsi in radians,
+   exRR as a fraction of S.scale. Sliders and numeric inputs are just views: a typed
+   value outside a slider's mapped range pins the slider at its end, computation uses it. */
+function exLogSpan() { return Math.log10(4) + 2.1; }
+function exSliderToRR(s) { return Math.pow(10, -2.1 + s * exLogSpan()); }      /* s in [0,1] -> r/scale */
+function exRRToSliderF(rRel) { return (Math.log10(rRel) + 2.1) / exLogSpan(); }
+function explorerAngles() { return { th: S.exTh, ph: S.exPh, psi: S.exPsi }; }
+function explorerR() { return S.exRR * S.scale; }
+function syncExControls() {
+  $('er').value = Math.round(Math.min(1, Math.max(0, exRRToSliderF(S.exRR))) * 1000);
+  $('eth').value = Math.round(Math.min(Math.PI, Math.max(0, S.exTh)) / Math.PI * 1000);
+  $('eph').value = Math.round(Math.min(2 * Math.PI, Math.max(0, S.exPh)) / (2 * Math.PI) * 1000);
+  $('eba').value = Math.round(Math.min(2 * Math.PI, Math.max(0, S.exPsi)) / (2 * Math.PI) * 1000);
+  $('ern').value = fmtSig(explorerR());
+  $('etn').value = fmtSig(S.exTh);
+  $('epn').value = fmtSig(S.exPh);
+  $('ebn').value = fmtSig(S.exPsi);
+}
+
+function explorerUpdate(redraw) {
+  if (!S.fn) return;
+  const { th, ph, psi } = explorerAngles();
+  const a = [
+    Math.sin(th) * Math.cos(ph),
+    Math.sin(th) * Math.sin(ph),
+    Math.cos(th)
+  ];
+  // basis perpendicular to a
+  let t1 = Math.abs(a[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  let e1 = [a[1] * t1[2] - a[2] * t1[1], a[2] * t1[0] - a[0] * t1[2], a[0] * t1[1] - a[1] * t1[0]];
+  const n1 = Math.hypot(e1[0], e1[1], e1[2]); e1 = e1.map((x) => x / n1);
+  const e2 = [a[1] * e1[2] - a[2] * e1[1], a[2] * e1[0] - a[0] * e1[2], a[0] * e1[1] - a[1] * e1[0]];
+  const b = [e1[0] * Math.cos(psi) + e2[0] * Math.sin(psi),
+             e1[1] * Math.cos(psi) + e2[1] * Math.sin(psi),
+             e1[2] * Math.cos(psi) + e2[2] * Math.sin(psi)];
+  const r = explorerR();
+  const c = [S.z[0] + a[0] * r, S.z[1] + a[1] * r, S.z[2] + a[2] * r];
+  const outPts = [];
+  const count = mcDiscPoints(c[0], c[1], c[2], b[0], b[1], b[2], r, S.pts, S.segs, S.nSeg, S.dbuf, S.nP, outPts, S.zSeg[0], S.zSeg[1], S.z[0], S.z[1], S.z[2], S.T, S.kCl, S.zWin.sA, S.zWin.sB, S.zWin.skipA, S.zWin.skipB);
+  const bt = b[0] * S.T[0] + b[1] * S.T[1] + b[2] * S.T[2];
+  const at = a[0] * S.T[0] + a[1] * S.T[1] + a[2] * S.T[2];
+  const odd = count % 2 === 1;
+  const v = [b[0] * at - a[0] * bt, b[1] * at - a[1] * bt, b[2] * at - a[2] * bt];
+  const endHit = !S.closed && S.ev && mcEndpointDegenerate(c[0], c[1], c[2], b[0], b[1], b[2], r, S.ev);
+  Object.assign(EX, { a, b, c, r, count, odd, btOk: bt > 0, v, endHit, outPts });
+  // readout
+  const cls = odd ? 'odd' : 'even';
+  const col = odd ? 'var(--orange)' : 'var(--blue)';
+  let html = 'D(z + a·r, b, r): <b style="color:' + col + '">' + cls + ' (' + count + ')</b>';
+  html += ' · b·t ' + (bt > 0 ? '&gt;' : '&le;') + ' 0' + (bt > 0 ? ' (accepted in MC)' : ' (excluded in MC)');
+  if (odd && bt > 0 && !endHit) html += ' · contribution −2·(b∧a)t = ' + fmtV(v.map((x) => -2 * x));
+  if (endHit) html += ' · <b>disc contains a curve endpoint</b> (would be skipped as degenerate)';
+  $('exclass').innerHTML = html;
+  if (redraw !== false) drawExplorer(outPts);
+}
+function drawExplorer(outPts) {
+  if (!TH) return;
+  const sc = TH.scene;
+  if (TH.discGroup) { sc.remove(TH.discGroup); disposeObj(TH.discGroup); TH.discGroup = null; }
+  if (!$('vdisc').checked) { tagExplorer.style.display = 'none'; return; }
+  tagExplorer.style.display = 'block';
+  const g = new THREE.Group();
+  const bv = new THREE.Vector3(...EX.b), cv = new THREE.Vector3(...EX.c);
+  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), bv);
+  // rim
+  const rim = [];
+  for (let i = 0; i <= 128; i++) {
+    const ph = (i / 128) * 2 * Math.PI;
+    rim.push(new THREE.Vector3(Math.cos(ph) * EX.r, Math.sin(ph) * EX.r, 0).applyQuaternion(quat).add(cv));
+  }
+  const ring = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(rim),
+    new THREE.LineBasicMaterial({ color: EX.odd ? PAL.orange : PAL.blue }));
+  g.add(ring);
+  // faint fill
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(EX.r, 64),
+    new THREE.MeshBasicMaterial({ color: EX.odd ? PAL.orange : PAL.blue, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false }));
+  fill.position.copy(cv); fill.quaternion.copy(quat);
+  g.add(fill);
+  // center dot
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.012 * S.scale, 12, 8),
+    new THREE.MeshBasicMaterial({ color: DARK ? 0xffffff : 0x222222 }));
+  dot.position.copy(cv); g.add(dot);
+  // normal arrow
+  const nArrow = new THREE.ArrowHelper(bv, cv, EX.r * 0.75 + 0.06 * S.scale, PAL.magenta, 0.05 * S.scale, 0.025 * S.scale);
+  g.add(nArrow);
+  // red intersection dots: grow/shrink with the Appearance thickness multiplier too
+  // (the disc-size clamp runs last, so dots still stay comfortably inside small discs)
+  const dg = new THREE.SphereGeometry(Math.min(0.016 * S.scale * S.thick, EX.r * 0.06), 12, 8);
+  const dm = new THREE.MeshBasicMaterial({ color: PAL.red });
+  for (let i = 0; i < outPts.length; i += 3) {
+    const s = new THREE.Mesh(dg, dm);
+    s.position.set(outPts[i], outPts[i + 1], outPts[i + 2]); g.add(s);
+  }
+  TH.discGroup = g; sc.add(g);
+  tagExplorer.className = 'tag ' + (EX.odd ? 'odd' : 'even');
+  tagExplorer.textContent = EX.odd ? 'odd (' + EX.count + ')' : 'even (' + EX.count + ')';
+}
+
+/* MC integrand cloud: instanced rings, orange=odd / blue=even, brightness ~ r^{-1-sigma} */
+function buildCloud(cloudF32, sigma, rs) {
+  if (!TH) return;
+  const sc = TH.scene;
+  if (TH.cloud) { sc.remove(TH.cloud); disposeObj(TH.cloud); TH.cloud = null; }
+  if (!cloudF32 || cloudF32.length === 0 || !$('vcloud').checked) return;
+  const stride = 9, m = cloudF32.length / stride;
+  // filter: hide far corpses far outside the view
+  const keep = [];
+  for (let k = 0; k < m; k++) {
+    const i = k * stride;
+    const cx = cloudF32[i], cy = cloudF32[i + 1], cz = cloudF32[i + 2], r = cloudF32[i + 6];
+    const dc = Math.hypot(cx - S.center[0], cy - S.center[1], cz - S.center[2]);
+    if (dc > 6 * S.scale || r > 6 * S.scale) continue;
+    keep.push(k);
+  }
+  if (keep.length === 0) return;
+  /* the ring band is a point-size feature: widen it with the same S.thick multiplier
+     (the radii stay data). band = 0.1 reproduces the old look at S.thick = 1. */
+  const band = Math.min(1, 0.1 * S.thick);
+  const geo = new THREE.RingGeometry(1 - band, 1, 40);
+  const mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.75, depthWrite: false });
+  const inst = new THREE.InstancedMesh(geo, mat, keep.length);
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Z = new THREE.Vector3(0, 0, 1);
+  const P = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  const col = new THREE.Color();
+  keep.forEach((k, n) => {
+    const i = k * stride;
+    C.set(cloudF32[i], cloudF32[i + 1], cloudF32[i + 2]);
+    B.set(cloudF32[i + 3], cloudF32[i + 4], cloudF32[i + 5]);
+    Q.setFromUnitVectors(Z, B);
+    const r = cloudF32[i + 6];
+    M.compose(C, Q, P.set(r, r, r));
+    inst.setMatrixAt(n, M);
+    const odd = cloudF32[i + 7] > 0.5;
+    const w = Math.pow(r / rs, -1 - sigma);   // integrand weight ~ r^{-1-sigma}, max ~1
+    const bright = 0.14 + 0.86 * Math.pow(Math.min(w, 1), 0.5);
+    col.setHex(odd ? PAL.orange : PAL.blue).multiplyScalar(bright);
+    inst.setColorAt(n, col);
+  });
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  TH.cloud = inst; sc.add(inst);
+}
+
+/* labels + animation */
+const _v = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+function projectTo(p, tag) {
+  if (!_v || !TH) return;
+  _v.set(p[0], p[1], p[2]).project(TH.camera);
+  if (_v.z > 1) { tag.style.display = 'none'; return; }
+  const w = $('viewwrap').clientWidth, h = $('viewwrap').clientHeight;
+  tag.style.display = 'block';
+  tag.style.left = ((_v.x * 0.5 + 0.5) * w) + 'px';
+  tag.style.top = ((-_v.y * 0.5 + 0.5) * h) + 'px';
+}
+function animate() {
+  if (!TH) return;
+  requestAnimationFrame(animate);
+  if ($('vrot').checked) { TH.orbit.th += 0.0025; TH.orbit.apply(); }
+  if (TH.discGroup && $('vdisc').checked) projectTo(EX.c, tagExplorer);
+  const showK = $('vlen').checked && S.results && TH.arrows.N && TH.arrows.N.userData.dir;
+  const showO = $('vlen').checked && S.results && TH.arrows.K && TH.arrows.K.userData.dir;
+  if (showK) {
+    const a = TH.arrows.N, d = a.userData.dir, len = Math.min(a.userData.true * a.userData.scale, a.userData.clen);
+    projectTo([S.z[0] + d.x * len, S.z[1] + d.y * len, S.z[2] + d.z * len], tagKeyA);
+    tagKeyA.textContent = '|κ̃_σ|=' + fmt(a.userData.true) + ' ± ' + fmt(a.userData.se) + (a.userData.true * a.userData.scale > a.userData.clen * 1.001 ? ' (truncated)' : '');
+  } else tagKeyA.style.display = 'none';
+  if (showO) {
+    const a = TH.arrows.K, d = a.userData.dir;
+    projectTo([S.z[0] + d.x * a.userData.clen, S.z[1] + d.y * a.userData.clen, S.z[2] + d.z * a.userData.clen], tagKeyC);
+    tagKeyC.textContent = '|κ⃗_σ|=' + fmt(a.userData.true) + ' ± ' + fmt(a.userData.se) + ' ×' + fmt(a.userData.scale);
+  } else tagKeyC.style.display = 'none';
+  TH.renderer.render(TH.scene, TH.camera);
+}
+</script>
+<script>
+'use strict';
+/* ================= compute flow ================= */
+let token = null;
+function setBusy(b, label) {
+  S.running = b;
+  $('compute').disabled = b;
+  $('compute').textContent = b ? (label || 'Computing…') : 'Compute κσ';
+  $('prog').classList.toggle('show', b);
+  $('ptext').classList.toggle('show', b);
+  if (b) $('prog').firstElementChild.style.width = '0%';
+  const vs = $('viewstatus');
+  if (b) { vs.classList.add('show'); vs.innerHTML = '<span>…</span><div class="bar"><i></i></div>'; }
+  else vs.classList.remove('show');
+}
+function progress(job, frac, total) {
+  const pct = Math.round(((job + frac) / total) * 100);
+  $('prog').firstElementChild.style.width = pct + '%';
+  const stage = job === 0 ? 'head MC' : (total > 2 ? 'tail MC (sweep)' : 'tail MC');
+  $('ptext').textContent = stage + ' … ' + pct + '%';
+  const vs = $('viewstatus');
+  if (S.running) { vs.firstElementChild.textContent = stage + ' … ' + pct + '%'; vs.querySelector('.bar i').style.width = pct + '%'; }
+}
+function cancelRun() {
+  if (token) { token.cancelled = true; if (token.abort) token.abort(); }
+  token = null;
+  setBusy(false);
+  $('ptext').textContent = 'Cancelled.';
+}
+
+function combine(F, FSE, Tl, TlSE, sigma) {
+  // HEAD = Frs/rs . rs^{1-s}/(1-s); tail direct; kappa_sigma = head + tail
+  const rs = S.rs;
+  const hf = Math.pow(rs, 1 - sigma) / ((1 - sigma) * rs);
+  const head = F.map((v) => v * hf), headSE = FSE.map((v) => v * hf);
+  const k = [head[0] + Tl[0], head[1] + Tl[1], head[2] + Tl[2]];
+  const se = [Math.hypot(headSE[0], TlSE[0]), Math.hypot(headSE[1], TlSE[1]), Math.hypot(headSE[2], TlSE[2])];
+  const kS = k.map((v) => (1 - sigma) * v), seS = se.map((v) => (1 - sigma) * v);
+  return { head, headSE, k, se, kS, seS };
+}
+
+/* Compact classical-vs-nonlocal comparison row under the σ slider. Mirrors the
+   detailed table's snapshot semantics: refreshed whenever renderResults runs (full
+   compute and live σ updates); the "Geometry changed — press Compute to refresh"
+   banner covers geometry/t₀ edits in between, exactly as for the table. */
+function renderCmpRow() {
+  const R = S.results;
+  $('vkcm').textContent = fmt(S.kClM);
+  $('vkcc').textContent = fmtV(S.kCl);
+  if (R) {
+    const kT = [R.kappaScaled[0] / C3, R.kappaScaled[1] / C3, R.kappaScaled[2] / C3];
+    const seT = [R.kappaScaledSE[0] / C3, R.kappaScaledSE[1] / C3, R.kappaScaledSE[2] / C3];
+    $('vknm').textContent = fmt(vnorm(kT)) + ' ± ' + fmt(seNorm(kT, seT));
+    $('vknc').textContent = fmtV(kT);
+  } else { $('vknm').textContent = '—'; $('vknc').textContent = ''; }
+}
+function renderResults() {
+  const R = S.results;
+  const tb = $('restbody');
+  if (!R) { tb.innerHTML = '<tr><td colspan="3" style="color:var(--faint)">Press Compute.</td></tr>'; renderCmpRow(); return; }
+  const sigma = S.sigma, kM = S.kClM;
+  const mK = vnorm(R.kappa), mKS = vnorm(R.kappaScaled);
+  const seK = seNorm(R.kappa, R.kappaSE), seKS = seNorm(R.kappaScaled, R.kappaScaledSE);
+  // κ̃_σ := (1−σ)κ_σ/c₃ is what the display rows below show; the raw (1−σ)
+  // quantities are kept only for the c₃-targeting ratio row and cosθ.
+  const kT = R.kappaScaled.map((v) => v / C3), seT = R.kappaScaledSE.map((v) => v / C3);
+  const mT = vnorm(kT), seTm = seNorm(kT, seT);
+  let rows = '';
+  const cls = 'var(--green)', or = 'var(--orange)', cy = 'var(--cyan)';
+  rows += row('<span class="dot" style="background:' + cls + '"></span>κ⃗ classical', fmtV(S.kCl), '—');
+  rows += row('<span class="dot" style="background:' + cls + '"></span>κ classical', fmt(kM), '—');
+  rows += row('<span class="dot" style="background:' + or + '"></span>κ⃗_σ', fmtV(R.kappa), fmtSE(R.kappaSE));
+  rows += row('<span class="dot" style="background:' + or + '"></span>|κ⃗_σ|', fmt(mK), fmt(seK));
+  rows += row('<span class="dot" style="background:' + cy + '"></span>κ̃_σ', fmtV(kT), fmtSE(seT));
+  rows += row('<span class="dot" style="background:' + cy + '"></span>|κ̃_σ|', fmt(mT), fmt(seTm));
+  if (kM > 1e-12 && mKS > 1e-300) {
+    const ratio = mKS / kM, seRatio = ratio * seKS / mKS;
+    rows += row('(1−σ)|κ⃗_σ| / κ', fmt(ratio), fmt(seRatio));
+    const c1 = vnorm(S.Frs) / (S.rs * kM);
+    const seC1 = seNorm(S.Frs, S.FrsSE) / (S.rs * kM);
+    rows += row('c₃ est |F(rs)|/(rs·κ)', fmt(c1), fmt(seC1));
+    const cos = (R.kappaScaled[0] * S.kCl[0] + R.kappaScaled[1] * S.kCl[1] + R.kappaScaled[2] * S.kCl[2]) / (mKS * kM);
+    rows += row('cosθ(κ̃_σ, κ⃗ classical)', fmt(cos), '—');
+  }
+  function row(l, v, s) { return '<tr><td>' + l + '</td><td class="num">' + v + '</td><td class="se">' + (s === '—' ? '—' : '± ' + s) + '</td></tr>'; }
+  let extra = '';
+  if (mKS > 0 && seKS / mKS > 0.2) extra += '<div class="warn">Relative SE of |κ̃<sub>σ</sub>| &gt; 20% — increase N_tail.</div>';
+  const diag = S.tailDiag;
+  if (diag) extra += '<div class="notes">MC: N_head=' + diag.nHead + ', nOdd(head)=' + diag.oddHead +
+    '; N_tail=' + diag.nTail + ', accepted=' + diag.acc + ', nOdd(tail)=' + diag.odd +
+    (diag.skips ? ', degenerate-skipped=' + diag.skips : '') + ', seed-fixed.</div>';
+  tb.innerHTML = rows;
+  $('resnotes').innerHTML = extra;
+  renderCmpRow();
+}
+
+async function computeFull() {
+  if (S.running || !S.fn) return;
+  S.Nh = Math.max(1000, parseInt($('nh').value, 10) || 200000);
+  S.Nt = Math.max(1000, parseInt($('nt').value, 10) || 60000);
+  setBusy(true);
+  token = { cancelled: false };
+  const sigmaJob = S.sigma;
+  const shared = sharedJobData();
+  const jobs = [
+    { kind: 'head', N: S.Nh, seed: 1234567, rs: S.rs, sigma: sigmaJob, collectCloud: false },
+    { kind: 'tail', N: S.Nt, seed: 7654321, rs: S.rs, sigma: sigmaJob, collectCloud: true }
+  ];
+  const results = await runJobs(jobs, shared, token, (j, f) => progress(j, f, 2));
+  if (results === null) { cancelRun(); return; }   // cancelled
+  const F = results[0], Tl = results[1];
+  S.Frs = F.vec; S.FrsSE = F.se;
+  const C = combine(F.vec, F.se, Tl.vec, Tl.se, sigmaJob);
+  S.tailDiag = { nHead: F.nAll, oddHead: F.nOdd, nTail: Tl.nAll, odd: Tl.nOdd, acc: Tl.nAcc, skips: F.nSkip + Tl.nSkip };
+  S.results = { kappa: C.k, kappaSE: C.se, kappaScaled: C.kS, kappaScaledSE: C.seS, sigma: sigmaJob, cloud: Tl.cloud };
+  buildCloud(Tl.cloud, sigmaJob, S.rs);
+  token = null;
+  setBusy(false);
+  renderResults();
+  buildArrows();
+  if (S.sigma !== sigmaJob && S.liveSig) { markStale(); liveSigmaUpdate(); }
+  else if (S.sigma !== sigmaJob) markStale();
+  else clearStale();
+}
+
+/* live sigma update: cached F(rs) + quick tail MC */
+let liveTimer = 0;
+function liveSigmaUpdate() {
+  if (!S.liveSig || !S.Frs || S.running) return;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(async () => {
+    if (S.running || !S.Frs) return;
+    setBusy(true, 'σ update…');
+    token = { cancelled: false };
+    const sigmaJob = S.sigma;
+    const shared = sharedJobData();
+    const jobs = [{ kind: 'tail', N: S.Nquick, seed: 7654321, rs: S.rs, sigma: sigmaJob, collectCloud: false }];
+    const results = await runJobs(jobs, shared, token, (j, f) => progress(j, f, 1));
+    if (results === null) { cancelRun(); return; }
+    const Tl = results[0];
+    const C = combine(S.Frs, S.FrsSE, Tl.vec, Tl.se, sigmaJob);
+    S.tailDiag = { nHead: S.tailDiag ? S.tailDiag.nHead : 0, oddHead: S.tailDiag ? S.tailDiag.oddHead : 0,
+                   nTail: Tl.nAll, odd: Tl.nOdd, acc: Tl.nAcc, skips: Tl.nSkip };
+    S.results = { kappa: C.k, kappaSE: C.se, kappaScaled: C.kS, kappaScaledSE: C.seS, sigma: sigmaJob, cloud: S.results ? S.results.cloud : null };
+    if (S.results.cloud) buildCloud(S.results.cloud, sigmaJob, S.rs);
+    token = null;
+    setBusy(false);
+    renderResults();
+    buildArrows();
+    if (S.sigma !== sigmaJob) { liveSigmaUpdate(); markStale(); } else clearStale();
+  }, 380);
+}
+
+/* Lanczos Gamma (double precision ~1e-12), for the exact circle curve below. */
+function gammaLanczos(z) {
+  const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+    9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gammaLanczos(1 - z));
+  z -= 1;
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  const tt = z + g + 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(tt, z + 0.5) * Math.exp(-tt) * x;
+}
+/* Exact (1-sigma)|kappa_sigma| for the unit circle (R = 1, kappa = 1):
+   Dan's Corollary 4.2 for n = 3 at point (1,0,0):
+   (1-s) * sqrt(2) pi^2 Gamma((2+s)/2) Gamma((1-s)/2) / (s Gamma(2) Gamma((3+s)/2) Gamma((2-s)/2)).
+   Acceptance anchors: s=0.5 -> 40.7275276900681, s=0.7 -> 25.3221626299443,
+   s=0.9 -> 16.8872861162039, s=0.95 -> 15.344255022029, s=0.99 -> 14.2236980235507. */
+function cor42Circle(s) {
+  if (s >= 1) return Math.PI * Math.PI * Math.SQRT2;  /* limit: (1-s)Gamma((1-s)/2) -> 2 */
+  return (1 - s) * Math.SQRT2 * Math.PI * Math.PI
+    * gammaLanczos((2 + s) / 2) * gammaLanczos((1 - s) / 2)
+    / (s * gammaLanczos((3 + s) / 2) * gammaLanczos((2 - s) / 2));
+}
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+/* σ-sweep plot.
+   SW.lo/SW.hi hold the range of the last sweep (0.1 → 0.99 until the first run).
+   The orange dashed reference is κ(z) — the classical curvature magnitude at the
+   current evaluation point z, which is the σ→1 limit of |κ̃_σ| (Dan, Theorem 6.1) —
+   it depends only on κ(z), so the whole plot (and the line's height) is redrawn
+   whenever t₀, the preset, or the custom curve changes. */
+/* sweep sampling layout: the original 14-point pattern normalized to [0,1]; each
+   range is sampled by mapping these fractions onto it, preserving relative spacing
+   (denser cluster near the upper end); the defaults reproduce the original σ list */
+const SW = { lo: 0.1, hi: 0.99 };
+const C3 = Math.PI * Math.PI * Math.SQRT2;
+const SWEEP_FRACS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.93, 0.95, 0.97, 0.99]
+  .map((s) => (s - 0.1) / (0.99 - 0.1));
+
+function fmtTick(t) {
+  let s = t.toFixed(4);
+  if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+}
+
+function drawSweep(msg) {
+  const svg = $('plot');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const W = 340, H = 190, mL = 46, mR = 12, mT = 10, mB = 30;
+  const lo = SW.lo, hi = SW.hi;
+  const xpad = (hi - lo) * 0.04 + 1e-12;
+  const dlo = lo - xpad, dhi = hi + xpad;
+  const xs = (s) => mL + (s - dlo) / (dhi - dlo) * (W - mL - mR);
+  const pts = S.sweptSigmas;
+  const lim = S.kClM;   // κ_classical(z)
+  const exactS = [];
+  if (S.presetKey === 'circle') {
+    for (let i = 0; i <= 60; i++) exactS.push(lo + (hi - lo) * i / 60);
+  }
+  const vals = [];
+  if (isFinite(lim)) vals.push(lim);
+  if (pts) for (const p of pts) { vals.push(p.m - p.sem, p.m + p.sem); }
+  for (const s of exactS) { const c = cor42Circle(s) / C3; if (isFinite(c)) vals.push(c); }
+  let ymin, ymax;
+  if (vals.length) {
+    ymin = Math.min.apply(null, vals); ymax = Math.max.apply(null, vals);
+    const ypad = (ymax - ymin) * 0.12 + 1e-6;
+    ymin -= ypad; ymax += ypad;
+  } else { ymin = 0; ymax = 1; }
+  const ys = (v) => mT + (1 - (v - ymin) / (ymax - ymin)) * (H - mT - mB);
+  const ink = getComputedStyle(document.body).getPropertyValue('--dim');
+  const faint = getComputedStyle(document.body).getPropertyValue('--faint');
+  const orange = getComputedStyle(document.body).getPropertyValue('--orange');
+  const dimc = getComputedStyle(document.body).getPropertyValue('--dim');
+  const cyanc = getComputedStyle(document.body).getPropertyValue('--cyan');
+  // axis lines
+  el('line', { x1: mL, y1: mT, x2: mL, y2: H - mB, stroke: faint, 'stroke-width': 1 }, svg);
+  el('line', { x1: mL, y1: H - mB, x2: W - mR, y2: H - mB, stroke: faint, 'stroke-width': 1 }, svg);
+  for (let i = 0; i <= 4; i++) {
+    const sx = lo + (hi - lo) * i / 4;
+    const t = el('text', { x: xs(sx), y: H - mB + 14, 'text-anchor': 'middle', fill: ink, 'font-size': 10 }, svg);
+    t.textContent = fmtTick(sx);
+    el('line', { x1: xs(sx), y1: H - mB, x2: xs(sx), y2: H - mB + 4, stroke: faint }, svg);
+  }
+  for (const q of [0, 0.5, 1]) {
+    const v = ymin + q * (ymax - ymin);
+    const t = el('text', { x: mL - 6, y: ys(v) + 3, 'text-anchor': 'end', fill: ink, 'font-size': 10 }, svg);
+    t.textContent = v >= 100 || v < 0.1 ? v.toExponential(1) : v.toFixed(1);
+  }
+  const yl = el('text', { x: 12, y: mT + 40, fill: ink, 'font-size': 10, transform: 'rotate(-90 12 ' + (mT + 40) + ')' }, svg);
+  yl.textContent = '|κ̃_σ|';
+  const xl = el('text', { x: (mL + W - mR) / 2, y: H - 4, 'text-anchor': 'middle', fill: ink, 'font-size': 10 }, svg);
+  xl.textContent = 'σ';
+  if (S.presetKey === 'circle') {
+    const lg = el('text', { x: W - mR, y: mT + 2, 'text-anchor': 'end', fill: ink, 'font-size': 9 }, svg);
+    lg.textContent = '−·− exact (unit circle, Cor 4.2)';
+  }
+  // exact circle curve (Dan, Cor 4.2), divided by c₃: gray dash-dot over the sweep range
+  for (let i = 1; i < exactS.length; i++) {
+    el('line', {
+      x1: xs(exactS[i - 1]), y1: ys(cor42Circle(exactS[i - 1]) / C3),
+      x2: xs(exactS[i]), y2: ys(cor42Circle(exactS[i]) / C3),
+      stroke: dimc, 'stroke-dasharray': '8 2.5 1.5 2.5', 'stroke-width': 1.25
+    }, svg);
+  }
+  // dashed reference: κ(z), labeled with its numeric value
+  if (isFinite(lim)) {
+    el('line', { x1: mL, y1: ys(lim), x2: W - mR, y2: ys(lim), stroke: orange, 'stroke-dasharray': '4 3', 'stroke-width': 1.5 }, svg);
+    const ly = ys(lim) - 5 > mT + 2 ? ys(lim) - 5 : ys(lim) + 13;
+    const lt = el('text', { x: W - mR, y: ly, 'text-anchor': 'end', fill: orange, 'font-size': 9 }, svg);
+    lt.textContent = 'κ(z) = ' + fmt(lim);
+  }
+  // points + error bars
+  if (pts) for (const p of pts) {
+    const x = xs(p.s), y = ys(p.m), y1 = ys(p.m - p.sem), y2 = ys(p.m + p.sem);
+    el('line', { x1: x, y1: y1, x2: x, y2: y2, stroke: cyanc, 'stroke-width': 1.5 }, svg);
+    el('circle', { cx: x, cy: y, r: 3, fill: cyanc }, svg);
+  }
+  if (!pts) {
+    const t = el('text', { x: (mL + W - mR) / 2, y: mT + (H - mT - mB) * 0.45, 'text-anchor': 'middle', fill: 'var(--faint)', 'font-size': 12 }, svg);
+    t.textContent = msg || 'Press "Run σ-sweep".';
+  }
+}
+async function runSweep() {
+  const err = $('sweeperr');
+  const smin = parseFloat($('smin').value), smax = parseFloat($('smax').value);
+  if (!(isFinite(smin) && isFinite(smax) && smin > 0 && smax < 1 && smin < smax)) {
+    err.classList.add('show');
+    return;
+  }
+  err.classList.remove('show');
+  if (S.running || !S.Frs) { if (!S.Frs) drawSweep('Run "Compute κσ" first.'); return; }
+  setBusy(true, 'Sweep…');
+  token = { cancelled: false };
+  const sigmas = SWEEP_FRACS.map((f) => smin + (smax - smin) * f);
+  const shared = sharedJobData();
+  const jobs = sigmas.map((s, i) => ({ kind: 'tail', N: S.Nquick, seed: 900000 + i * 77, rs: S.rs, sigma: s, collectCloud: false }));
+  const results = await runJobs(jobs, shared, token, (j, f) => progress(j, f, jobs.length));
+  if (results === null) { cancelRun(); return; }
+  const pts = sigmas.map((s, i) => {
+    const Tl = results[i];
+    const hf = Math.pow(S.rs, 1 - s) / ((1 - s) * S.rs);
+    const head = S.Frs.map((v) => v * hf), headSE = S.FrsSE.map((v) => v * hf);
+    const k = [head[0] + Tl.vec[0], head[1] + Tl.vec[1], head[2] + Tl.vec[2]];
+    const se = [Math.hypot(headSE[0], Tl.se[0]), Math.hypot(headSE[1], Tl.se[1]), Math.hypot(headSE[2], Tl.se[2])];
+    const m = (1 - s) * vnorm(k) / C3;
+    const sem = (1 - s) * seNorm(k, se) / C3;
+    return { s, m, sem };
+  });
+  S.sweptSigmas = pts;
+  SW.lo = smin; SW.hi = smax;
+  drawSweep();
+  token = null;
+  setBusy(false);
+}
+
+</script>
+<script>
+'use strict';
+/* ================= explorer helpers ================= */
+function explorerDisc() {
+  const { th, ph, psi } = explorerAngles();
+  const a = [Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)];
+  let t1 = Math.abs(a[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  let e1 = [a[1] * t1[2] - a[2] * t1[1], a[2] * t1[0] - a[0] * t1[2], a[0] * t1[1] - a[1] * t1[0]];
+  const n1 = Math.hypot(e1[0], e1[1], e1[2]);
+  e1 = e1.map((x) => x / n1);
+  const e2 = [a[1] * e1[2] - a[2] * e1[1], a[2] * e1[0] - a[0] * e1[2], a[0] * e1[1] - a[1] * e1[0]];
+  const b = [e1[0] * Math.cos(psi) + e2[0] * Math.sin(psi),
+             e1[1] * Math.cos(psi) + e2[1] * Math.sin(psi),
+             e1[2] * Math.cos(psi) + e2[2] * Math.sin(psi)];
+  const r = explorerR();
+  const c = [S.z[0] + a[0] * r, S.z[1] + a[1] * r, S.z[2] + a[2] * r];
+  return { a, b, c, r };
+}
+function explorerCount(a, b, c, r) {
+  const outPts = [];
+  const n = mcDiscPoints(c[0], c[1], c[2], b[0], b[1], b[2], r, S.pts, S.segs, S.nSeg, S.dbuf, S.nP, outPts, S.zSeg[0], S.zSeg[1], S.z[0], S.z[1], S.z[2], S.T, S.kCl, S.zWin.sA, S.zWin.sB, S.zWin.skipA, S.zWin.skipB);
+  return { n, outPts };
+}
+function randomExploratory(needOdd) {
+  if (!S.fn || S.running) return;
+  for (let tries = 0; tries < 600; tries++) {
+    S.exTh = Math.random() * Math.PI; S.exPh = Math.random() * 2 * Math.PI; S.exPsi = Math.random() * 2 * Math.PI;
+    S.exRR = exSliderToRR(Math.random());
+    const { a, b, c, r } = explorerDisc();
+    const { n } = explorerCount(a, b, c, r);
+    if (!needOdd || n % 2 === 1) break;
+  }
+  syncExControls(); explorerUpdate();
+}
+
+/* ================= slider + control wiring ================= */
+function syncClosedUI() { $('closed').checked = S.closed; }
+/* r_s display: S.rs is the absolute radius used by the computation; the numeric
+   input pins the slider at its ends instead of clamping the computation value. */
+function updateRsLabel() {
+  S.rs = S.rsFrac * S.scale;
+  $('rsn').value = fmtSig(S.rs);
+}
+function rsFracToSlider() {
+  return Math.round(Math.min(1, Math.max(0, (Math.log10(S.rsFrac) + 3) / (Math.log10(0.5) + 3))) * 1000);
+}
+function t0FromSlider() {
+  const mid = (S.tmin + S.tmax) / 2, half = (S.tmax - S.tmin) / 2;
+  return mid + (parseFloat($('t0').value) / 1000) * half;
+}
+function sliderFromT0() {
+  const mid = (S.tmin + S.tmax) / 2, half = (S.tmax - S.tmin) / 2;
+  $('t0').value = Math.round((S.t0 - mid) / half * 1000);
+}
+function setBusyCancel(b) { $('cancelbtn').style.display = b ? 'block' : 'none'; }
+
+const _origSetBusy = setBusy;
+setBusy = function (b, label) { _origSetBusy(b, label); setBusyCancel(b); };
+
+function wireUI() {
+  $('preset').addEventListener('change', () => {
+    $('custombox').style.display = $('preset').value === 'custom' ? 'block' : 'none';
+    S.closedManual = null;
+    buildCurve();
+    S.sweptSigmas = null; drawSweep();
+  });
+  $('applycurve').addEventListener('click', () => { S.closedManual = null; buildCurve(); S.sweptSigmas = null; drawSweep(); });
+  let nptsT = 0;
+  $('npts').addEventListener('input', () => {
+    $('nptsv').textContent = $('npts').value;
+    clearTimeout(nptsT);
+    nptsT = setTimeout(() => { buildCurve(); }, 700);
+  });
+  $('closed').addEventListener('change', () => { S.closedManual = $('closed').checked; buildCurve(); });
+  $('t0').addEventListener('input', () => { setT0(t0FromSlider(), false); markStale(); });
+  $('t0n').addEventListener('change', () => {
+    const err = $('t0err'), v = parseFloat($('t0n').value);
+    if (!isFinite(v)) { $('t0n').value = fmtSig(S.t0); return; }   /* not a number: revert quietly */
+    if (v < S.tmin || v > S.tmax) {
+      err.textContent = 't₀ must lie in [' + fmtSig(S.tmin) + ', ' + fmtSig(S.tmax) + '].';
+      err.classList.add('show');
+      $('t0n').value = fmtSig(S.t0);      /* reject; revert to the last valid value */
+      return;
+    }
+    setT0(v, false); sliderFromT0(); markStale();   /* inside the domain: never clamped */
+  });
+  function sigmaApplyLive() {
+    if (S.liveSig && S.Frs) liveSigmaUpdate();
+    else markStale();
+  }
+  $('sig').addEventListener('input', () => {
+    S.sigma = Math.round(parseFloat($('sig').value) * 1e4) / 1e4;  // quantize away float noise
+    $('sign').value = fmtSig(S.sigma);
+    sigmaApplyLive();
+  });
+  $('sign').addEventListener('change', () => {
+    // The numeric field accepts arbitrary precision in the open interval (0, 1);
+    // there is intentionally no upper-precision cap beyond what double parsing carries.
+    const err = $('sigmerr'), v = parseFloat($('sign').value);
+    if (!isFinite(v) || v <= 0 || v >= 1) {
+      err.classList.add('show');              // reject σ <= 0 and σ >= 1 with an inline note
+      $('sign').value = fmtSig(S.sigma);      // revert to the last valid value
+      return;
+    }
+    err.classList.remove('show');
+    S.sigma = v;                              // true typed value runs the computation
+    const lo = parseFloat($('sig').min), hi = parseFloat($('sig').max);
+    $('sig').value = Math.min(hi, Math.max(lo, v));  // pin the slider to its ends; never clamps S.sigma
+    $('sign').value = fmtSig(v);              // echo the exact value (full round-trip precision)
+    sigmaApplyLive();
+  });
+  $('rs').addEventListener('input', () => {
+    const v = parseFloat($('rs').value) / 1000;
+    S.rsFrac = Math.pow(10, -3 + v * (Math.log10(0.5) + 3));
+    updateRsLabel(); markStale();
+  });
+  $('rsn').addEventListener('change', () => {
+    const err = $('rserr'), v = parseFloat($('rsn').value);
+    if (!isFinite(v) || v <= 0) {
+      err.classList.add('show');
+      $('rsn').value = fmtSig(S.rs);   /* reject r_s <= 0; revert to the last valid value */
+      return;
+    }
+    err.classList.remove('show');
+    S.rsFrac = v / S.scale;           /* true typed value runs the computation */
+    $('rs').value = rsFracToSlider(); /* pin the slider at its ends; never clamps S.rs */
+    updateRsLabel();                  /* updates S.rs and echoes the typed value */
+    markStale();
+  });
+  $('livesig').addEventListener('change', () => { S.liveSig = $('livesig').checked; });
+  $('compute').addEventListener('click', computeFull);
+  $('cancelbtn').addEventListener('click', cancelRun);
+  $('sweep').addEventListener('click', runSweep);
+  // explorer: sliders move the S.ex* computation values and echo into the numeric inputs
+  $('eth').addEventListener('input', () => { S.exTh = (parseFloat($('eth').value) / 1000) * Math.PI; $('etn').value = fmtSig(S.exTh); explorerUpdate(); });
+  $('eph').addEventListener('input', () => { S.exPh = (parseFloat($('eph').value) / 1000) * 2 * Math.PI; $('epn').value = fmtSig(S.exPh); explorerUpdate(); });
+  $('eba').addEventListener('input', () => { S.exPsi = (parseFloat($('eba').value) / 1000) * 2 * Math.PI; $('ebn').value = fmtSig(S.exPsi); explorerUpdate(); });
+  $('er').addEventListener('input', () => { S.exRR = exSliderToRR(parseFloat($('er').value) / 1000); $('ern').value = fmtSig(explorerR()); explorerUpdate(); });
+  // typed angles accept any finite value and wrap internally (trig is periodic); r must be positive
+  $('etn').addEventListener('change', () => {
+    const v = parseFloat($('etn').value);
+    if (isFinite(v)) S.exTh = v;
+    syncExControls(); explorerUpdate();
+  });
+  $('epn').addEventListener('change', () => {
+    const v = parseFloat($('epn').value);
+    if (isFinite(v)) S.exPh = v;
+    syncExControls(); explorerUpdate();
+  });
+  $('ebn').addEventListener('change', () => {
+    const v = parseFloat($('ebn').value);
+    if (isFinite(v)) S.exPsi = v;
+    syncExControls(); explorerUpdate();
+  });
+  $('ern').addEventListener('change', () => {
+    const err = $('ererr'), v = parseFloat($('ern').value);
+    if (!isFinite(v) || v <= 0) {
+      err.classList.add('show');
+      $('ern').value = fmtSig(explorerR());
+      return;
+    }
+    err.classList.remove('show');
+    S.exRR = v / S.scale;   /* true typed value runs the computation */
+    syncExControls();       /* pins the slider at its ends; never clamps S.exRR */
+    explorerUpdate();
+  });
+  $('randdisc').addEventListener('click', () => randomExploratory(false));
+  $('randodd').addEventListener('click', () => randomExploratory(true));
+  // view toggles
+  $('vcloud').addEventListener('change', () => { if (S.results && S.results.cloud) buildCloud(S.results.cloud, S.sigma, S.rs); });
+  $('varrows').addEventListener('change', () => buildArrows());
+  $('vdisc').addEventListener('change', () => explorerUpdate());
+  $('vlen').addEventListener('change', () => updateKeyLabels());
+  // appearance: thickness multiplies the tube radius AND the 3D point sizes (z marker,
+  // disc intersection dots, MC cloud rings); live, no MC recompute
+  $('th').addEventListener('input', () => {
+    S.thick = parseFloat($('th').value) / 1000;
+    $('thn').value = fmtSig(S.thick);
+    applyThickness();
+  });
+  $('thn').addEventListener('change', () => {
+    const err = $('therr'), v = parseFloat($('thn').value);
+    if (!isFinite(v) || v < 0) {
+      err.classList.add('show');
+      $('thn').value = fmtSig(S.thick);
+      return;
+    }
+    err.classList.remove('show');
+    S.thick = v;                                       /* true typed value is used */
+    $('th').value = Math.round(Math.min(8, v) * 1000); /* pin the slider at its ends */
+    $('thn').value = fmtSig(v);
+    applyThickness();
+  });
+}
+
+/* ================= persistence (best-effort UI state) ================= */
+/* UI state is saved to localStorage under a versioned key and restored on load.
+   ALL storage access is wrapped in try/catch: where storage is unavailable
+   (private browsing, sandboxed iframe) it silently no-ops — nothing ever throws.
+   Writes go out on committed changes/pointerup, debounced, never on slider ticks. */
+const LS_KEY = 'nlc-viz-v1';
+function lsGet() { try { return localStorage.getItem(LS_KEY); } catch (e) { return null; } }
+function lsSet(s) { try { localStorage.setItem(LS_KEY, s); } catch (e) { /* no-op */ } }
+function gatherState() {
+  return {
+    v: 1,
+    preset: $('preset').value,
+    fx: $('fx').value, fy: $('fy').value, fz: $('fz').value,
+    tmin: parseFloat($('tmin').value), tmax: parseFloat($('tmax').value),
+    npts: parseInt($('npts').value, 10),
+    closedManual: S.closedManual,
+    t0: S.t0, sigma: S.sigma,
+    smin: parseFloat($('smin').value), smax: parseFloat($('smax').value),
+    nh: parseInt($('nh').value, 10), nt: parseInt($('nt').value, 10),
+    rsFrac: S.rsFrac, thick: S.thick,
+    view: { vcloud: $('vcloud').checked, varrows: $('varrows').checked, vdisc: $('vdisc').checked,
+            vlen: $('vlen').checked, vrot: $('vrot').checked },
+    livesig: $('livesig').checked,
+    ex: { th: S.exTh, ph: S.exPh, psi: S.exPsi, rRel: S.exRR },
+    open: { resdet: $('resdet').open, conv: $('conv').open, adv: $('adv').open,
+            appear: $('appear').open, funcref: $('funcref').open }
+  };
+}
+let _saveT = 0;
+function scheduleSave() { clearTimeout(_saveT); _saveT = setTimeout(saveState, 500); }
+function saveState() { clearTimeout(_saveT); try { lsSet(JSON.stringify(gatherState())); } catch (e) { /* noop */ } updateUrlHash(); }
+/* ---------- URL share state (#s=base64url JSON) ----------
+   The hash is the shareable form of the same object saved to localStorage.
+   On load the hash wins (a shared link must show the shared state, not the
+   viewer's saved state); localStorage is the fallback when no hash is present. */
+function encodeShareState(obj) {
+  try {
+    const json = JSON.stringify(obj);
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  } catch (e) { return ''; }
+}
+function decodeShareState() {
+  try {
+    const m = (location.hash || '').match(/#s=([A-Za-z0-9\-_]+)/);
+    if (!m) return null;
+    let b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const json = decodeURIComponent(escape(atob(b64)));
+    const o = JSON.parse(json);
+    return (o && typeof o === 'object') ? o : null;
+  } catch (e) { return null; }
+}
+let _urlT = 0;
+function updateUrlHash() {
+  clearTimeout(_urlT);
+  _urlT = setTimeout(() => {
+    try {
+      const enc = encodeShareState(gatherState());
+      if (!enc) return;
+      const next = '#s=' + enc;
+      if (location.hash !== next) history.replaceState(null, '', next);
+    } catch (e) { /* noop */ }
+  }, 350);
+}
+function applyStateObject(o) {
+  if (!o || o.v !== 1 || typeof o !== 'object') return;
+  const num = (x) => (typeof x === 'number' && isFinite(x)) ? x : null;
+  const bool = (x) => (typeof x === 'boolean') ? x : null;
+  /* preset + custom expressions + t range (buildCurve consumes these) */
+  if (['circle', 'trefoil', 'helix', 'line', 'custom'].indexOf(o.preset) >= 0) {
+    $('preset').value = o.preset;
+    $('custombox').style.display = o.preset === 'custom' ? 'block' : 'none';
+  }
+  if (typeof o.fx === 'string') $('fx').value = o.fx;
+  if (typeof o.fy === 'string') $('fy').value = o.fy;
+  if (typeof o.fz === 'string') $('fz').value = o.fz;
+  const tmin = num(o.tmin), tmax = num(o.tmax);
+  if (tmin !== null && tmax !== null && tmax > tmin) { $('tmin').value = tmin; $('tmax').value = tmax; }
+  const npts = num(o.npts);
+  if (npts !== null) {
+    const n = Math.round(Math.min(4000, Math.max(200, npts)));
+    $('npts').value = n; $('nptsv').textContent = String(n);
+  }
+  if (o.closedManual === null || typeof o.closedManual === 'boolean') S.closedManual = o.closedManual;
+  const t0 = num(o.t0); if (t0 !== null) S.t0 = t0;           /* buildCurve clamps into the restored domain */
+  const sig = num(o.sigma); if (sig !== null && sig > 0 && sig < 1) S.sigma = sig;
+  const smin = num(o.smin), smax = num(o.smax);
+  if (smin !== null && smax !== null && smin > 0 && smin < smax && smax < 1) { $('smin').value = smin; $('smax').value = smax; }
+  const nh = num(o.nh); if (nh !== null && nh >= 1000) $('nh').value = Math.round(nh);
+  const nt = num(o.nt); if (nt !== null && nt >= 1000) $('nt').value = Math.round(nt);
+  const rsF = num(o.rsFrac); if (rsF !== null && rsF > 0 && rsF <= 10) S.rsFrac = rsF;
+  const th = num(o.thick); if (th !== null && th >= 0 && th <= 20) S.thick = th;
+  if (o.view && typeof o.view === 'object') {
+    for (const id of ['vcloud', 'varrows', 'vdisc', 'vlen', 'vrot']) {
+      const b = bool(o.view[id]); if (b !== null) $(id).checked = b;
+    }
+  }
+  const ls = bool(o.livesig); if (ls !== null) { S.liveSig = ls; $('livesig').checked = ls; }
+  if (o.ex && typeof o.ex === 'object') {
+    const exT = num(o.ex.th), exP = num(o.ex.ph), exS = num(o.ex.psi), exR = num(o.ex.rRel);
+    if (exT !== null) S.exTh = exT;                          /* angles wrap internally, any value ok */
+    if (exP !== null) S.exPh = exP;
+    if (exS !== null) S.exPsi = exS;
+    if (exR !== null && exR > 0 && exR <= 100) S.exRR = exR;
+  }
+  if (o.open && typeof o.open === 'object') {
+    for (const id of ['resdet', 'conv', 'adv', 'appear', 'funcref']) {
+      const b = bool(o.open[id]); if (b !== null) $(id).open = b;
+    }
+  }
+}
+function restoreState() {
+  /* URL hash wins over localStorage: a shared link must show the shared state,
+     not the viewer's saved state. localStorage is the fallback. */
+  const fromHash = decodeShareState();
+  if (fromHash) { applyStateObject(fromHash); return; }
+  let o;
+  try {
+    const raw = lsGet();
+    if (!raw) return;
+    o = JSON.parse(raw);
+  } catch (e) { return; }
+  applyStateObject(o);
+}
+/* ---------- intro popups ---------- */
+/* SHOW_INTRO_EVERY_LOAD: true = show the 3-popup intro on every page load.
+   Set to false to switch to show-once (the nlc-intro-seen flag below then
+   suppresses repeats). Dan asked for every-load for now. */
+const SHOW_INTRO_EVERY_LOAD = true;
+const INTRO_SEEN_KEY = 'nlc-intro-seen';
+let introStep = 1;
+function introSeen() { try { return localStorage.getItem(INTRO_SEEN_KEY) === '1'; } catch (e) { return false; } }
+function markIntroSeen() { try { localStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* noop */ } }
+function showIntroStep(n) {
+  introStep = Math.min(3, Math.max(1, n));
+  for (let i = 1; i <= 3; i++) {
+    $('intro-slide-' + i).style.display = (i === introStep) ? 'block' : 'none';
+    $('intro-dot-' + i).classList.toggle('on', i === introStep);
+  }
+  $('intro-back').disabled = (introStep === 1);
+  $('intro-back').style.opacity = (introStep === 1) ? '0.45' : '1';
+  $('intro-next').textContent = (introStep === 3) ? 'Done' : 'Next';
+}
+function openIntro() { $('intro-overlay').classList.add('show'); showIntroStep(1); }
+function closeIntro() { $('intro-overlay').classList.remove('show'); markIntroSeen(); }
+function wireIntro() {
+  $('intro-next').addEventListener('click', () => { if (introStep >= 3) closeIntro(); else showIntroStep(introStep + 1); });
+  $('intro-back').addEventListener('click', () => showIntroStep(introStep - 1));
+  $('intro-skip').addEventListener('click', closeIntro);
+  if (SHOW_INTRO_EVERY_LOAD || !introSeen()) openIntro();
+}
+function wireShareLink() {
+  $('sharelink').addEventListener('click', async () => {
+    /* flush the current state into the hash first so the copied link is exact */
+    try {
+      const enc = encodeShareState(gatherState());
+      if (enc) history.replaceState(null, '', '#s=' + enc);
+    } catch (e) { /* noop */ }
+    const msg = $('sharelink-msg');
+    try {
+      await navigator.clipboard.writeText(location.href);
+      msg.textContent = 'Link copied — it restores this exact state.';
+    } catch (e) {
+      msg.textContent = 'Copy failed — copy the address bar URL instead.';
+    }
+    setTimeout(() => { msg.textContent = ''; }, 2600);
+  });
+}
+function wireSave() {
+  document.querySelectorAll('#panel input, #panel select, #panel textarea').forEach((elm) => {
+    elm.addEventListener('change', scheduleSave);
+    if (elm.type === 'range') elm.addEventListener('pointerup', () => saveState());
+  });
+  document.querySelectorAll('#panel details').forEach((d) => d.addEventListener('toggle', scheduleSave));
+  $('applycurve').addEventListener('click', scheduleSave);
+  $('randdisc').addEventListener('click', scheduleSave);
+  $('randodd').addEventListener('click', scheduleSave);
+}
+
+/* ================= init ================= */
+function init() {
+  restoreState();                /* before first render; invalid/missing values keep DOM/S defaults */
+  drawSweep();
+  $('rs').value = rsFracToSlider();   /* pin the slider; never clamps the restored S.rsFrac */
+  $('sig').value = Math.min(0.9999, Math.max(0.05, S.sigma));
+  $('sign').value = fmtSig(S.sigma);
+  syncExControls();              /* explorerR's absolute value re-syncs in buildCurve once S.scale is known */
+  $('th').value = Math.round(Math.min(8, S.thick) * 1000);
+  $('thn').value = fmtSig(S.thick);
+  initThree();
+  wireUI();
+  wireSave();                    /* change/pointerup, debounced — no writes on slider ticks */
+  wireIntro();
+  wireShareLink();
+  updateUrlHash();               /* reflect the restored state in the share hash on load */
+  if (buildCurve()) {
+    renderCmpRow(); // classical side visible even before the first compute finishes
+    setBusyCancel(false);
+    try { setTimeout(() => { if (!S.running && S.fn) computeFull(); }, 250); }
+    catch (e) { /* noop */ }
+  }
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+<!-- /app -->
+</body>
+</html>
